@@ -542,7 +542,6 @@ APP_HTML = r'''
 
   function drawChromateStage(W,H){
     const centerX = W*.45, topY = H*.15, beakerW=Math.min(390,W*.58), beakerH=Math.min(365,H*.70);
-    const x = centerX - beakerW/2;
     const b=state.displayChromate.balance;
     const r = Math.round(235*(1-b)+246*b), gg=Math.round(104*(1-b)+218*b), bb=Math.round(34*(1-b)+70*b);
 
@@ -559,38 +558,79 @@ APP_HTML = r'''
     ctx.strokeStyle='#9fb0c2'; ctx.lineWidth=4;
     ctx.beginPath(); ctx.ellipse(centerX, topY, beakerW/2, 16,0,0,Math.PI*2); ctx.stroke();
 
-    // 용액: 예전 버전처럼 사다리꼴 형태 + 잔잔한 수면으로 표시
+    // 용액: 사다리꼴 형태 + 흔들리는 수면 애니메이션
     const liquidH = beakerH*.72;
     const liquidY = topY+beakerH-liquidH;
+    const leftTop = centerX-beakerW/2+18;
+    const rightTop = centerX+beakerW/2-18;
+    const bottomRight = centerX+beakerW/2-50;
+    const bottomLeft = centerX-beakerW/2+50;
+    const bottomY = topY+beakerH-8;
+    const now = performance.now();
+    const transitionT = state.anim && state.anim.type==='chromate' ? clamp((now-state.anim.startT)/state.anim.duration,0,1) : 1;
+    const settling = state.anim && state.anim.type==='chromate' ? (1-transitionT) : .18;
+    const waveAmp = 3.2 + settling*6.5 + (state.temp/120)*1.6;
+    const waveTime = now*.0042;
+    function surfaceY(px){
+      const u = (px-leftTop)/(rightTop-leftTop);
+      return liquidY
+        + Math.sin(u*Math.PI*2.15 + waveTime)*waveAmp
+        + Math.sin(u*Math.PI*4.5 - waveTime*1.25)*(waveAmp*.32);
+    }
+    function liquidPath(){
+      ctx.beginPath();
+      ctx.moveTo(leftTop, surfaceY(leftTop));
+      const steps=42;
+      for(let i=1;i<=steps;i++){
+        const px = leftTop + (rightTop-leftTop)*i/steps;
+        ctx.lineTo(px, surfaceY(px));
+      }
+      ctx.lineTo(bottomRight,bottomY);
+      ctx.lineTo(bottomLeft,bottomY);
+      ctx.closePath();
+    }
+
     const grd = ctx.createLinearGradient(0,liquidY,0,topY+beakerH);
     grd.addColorStop(0,`rgba(${r},${gg},${bb},.82)`);
     grd.addColorStop(1,`rgba(${Math.min(255,r+10)},${Math.min(255,gg+12)},${Math.min(255,bb+8)},.96)`);
     ctx.fillStyle=grd;
-    ctx.beginPath();
-    ctx.moveTo(centerX-beakerW/2+18,liquidY);
-    ctx.bezierCurveTo(centerX-beakerW/4,liquidY-10,centerX+beakerW/4,liquidY+10,centerX+beakerW/2-18,liquidY);
-    ctx.lineTo(centerX+beakerW/2-50,topY+beakerH-8);
-    ctx.lineTo(centerX-beakerW/2+50,topY+beakerH-8);
-    ctx.closePath(); ctx.fill();
+    liquidPath();
+    ctx.fill();
+
     // 용액 영역 클리핑 뒤 정지된 이온 점 표시
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(centerX-beakerW/2+18,liquidY);
-    ctx.bezierCurveTo(centerX-beakerW/4,liquidY-10,centerX+beakerW/4,liquidY+10,centerX+beakerW/2-18,liquidY);
-    ctx.lineTo(centerX+beakerW/2-50,topY+beakerH-8);
-    ctx.lineTo(centerX-beakerW/2+50,topY+beakerH-8);
-    ctx.closePath(); ctx.clip();
+    liquidPath();
+    ctx.clip();
     for(const d of state.staticDots){
       const px = centerX-beakerW*.34 + d.x*beakerW*.68;
-      const py = liquidY + 22 + d.y*(liquidH-45);
+      const py = liquidY + 28 + d.y*(liquidH-55);
       ctx.globalAlpha=.56;
       ctx.fillStyle = d.kind===0?'rgba(211,93,30,.72)':'rgba(255,238,80,.72)';
       ctx.beginPath(); ctx.arc(px,py,3.7+d.kind*.6,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
     }
     ctx.restore();
-    ctx.fillStyle='rgba(255,255,255,.32)';
-    ctx.beginPath(); ctx.ellipse(centerX,liquidY,beakerW*.42,14,0,0,Math.PI*2); ctx.fill();
+
+    // 수면 하이라이트: 실제 흔들림이 눈에 보이도록 밝은 선과 얇은 반사광 추가
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,.58)'; ctx.lineWidth=2.2; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(leftTop+8, surfaceY(leftTop+8));
+    const steps=38;
+    for(let i=1;i<=steps;i++){
+      const px = leftTop+8 + (rightTop-leftTop-16)*i/steps;
+      ctx.lineTo(px, surfaceY(px));
+    }
+    ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.24)'; ctx.lineWidth=1.2;
+    ctx.beginPath();
+    for(let i=0;i<=steps;i++){
+      const px = leftTop+24 + (rightTop-leftTop-48)*i/steps;
+      const py = surfaceY(px)+11+Math.sin(i*.5+waveTime)*1.8;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    ctx.restore();
 
     // 비커 아래 상태 문구를 예전 방식으로 복원한다. 단, '중간 평형 색'은 '중간색'으로 단순화한다.
     const label = b>.66 ? 'CrO₄²⁻ 증가 · 노란색' : (b<.38 ? 'Cr₂O₇²⁻ 증가 · 주황색' : '중간색');
