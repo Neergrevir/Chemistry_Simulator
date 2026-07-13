@@ -443,6 +443,15 @@ APP_HTML = r'''
     $('volume').value = to;
     state.volumeAnim = {from, to, start:performance.now(), duration};
   }
+  function triggerGasDensityPulse(compressionSignal, duration=1750){
+    if(state.experiment!=='gas') return;
+    if(!Number.isFinite(compressionSignal) || Math.abs(compressionSignal)<0.0001) return;
+    // compressionSignal > 0 : 압축/압력 증가 → NO₂ 농도 순간 증가 → 잠깐 진해짐
+    // compressionSignal < 0 : 팽창/압력 감소 → NO₂ 농도 순간 감소 → 잠깐 옅어짐
+    // 슬라이더가 0.01 단위로 움직여도 눈에 보이도록 제곱근으로 감도를 높인다.
+    const signedStrength = Math.sign(compressionSignal) * clamp(Math.sqrt(Math.abs(compressionSignal)), 0, 1);
+    state.volumePulse = {amount:signedStrength*.24, start:performance.now(), duration};
+  }
   function animatePistonByEquilibrium(startGas,targetGas){
     if(state.experiment!=='gas' || state.vessel!=='cylinder') return;
     // 평형 이동에 따른 피스톤 움직임은 state.volume을 직접 바꾸지 않는다.
@@ -967,7 +976,18 @@ APP_HTML = r'''
   });
   document.querySelectorAll('input[name="vessel"]').forEach(r=>r.addEventListener('change',e=>{state.vessel=e.target.value;applyConditionChange();}));
   $('temp').addEventListener('input',e=>{state.temp=Number(e.target.value);applyConditionChange();});
-  $('pressure').addEventListener('input',e=>{state.pressure=Number(e.target.value);applyConditionChange();});
+  $('pressure').addEventListener('input',e=>{
+    const nextPressure=Number(e.target.value);
+    const prevPressure=state.pressure;
+    state.pressure=nextPressure;
+    if(state.experiment==='gas'){
+      // 압력 증가: 순간 압축으로 NO₂ 농도가 커져 잠깐 진해진 뒤,
+      // 평형 이동 과정에서 N₂O₄ 쪽으로 이동하며 다시 옅어진다.
+      // 압력 감소는 반대로 순간적으로 옅어진 뒤 NO₂ 쪽으로 이동한다.
+      triggerGasDensityPulse((nextPressure-prevPressure)*1.15, 1750);
+    }
+    applyConditionChange();
+  });
   $('volume').addEventListener('input',e=>{
     const nextVolume=Number(e.target.value);
     const prevVolume=state.volume;
@@ -975,10 +995,9 @@ APP_HTML = r'''
     state.displayVolume=state.volume;
     state.volumeAnim=null;
     if(state.experiment==='gas'){
-      // 부피 조절로 압력이 변하는 순간의 색 변화도 보이게 한다.
-      // 압축: NO₂ 농도 순간 증가 → 잠깐 진해짐, 팽창: 잠깐 옅어짐.
-      const compression = clamp((prevVolume-nextVolume)/1.2, -1, 1);
-      state.volumePulse={amount:compression*.16, start:performance.now(), duration:1400};
+      // 부피 감소: 순간 압축으로 더 진해짐 → 이후 평형 이동으로 연해짐.
+      // 부피 증가: 순간 팽창으로 더 옅어짐 → 이후 평형 이동으로 진해짐.
+      triggerGasDensityPulse((prevVolume-nextVolume)*1.05, 1750);
     }
     applyConditionChange();
   });
