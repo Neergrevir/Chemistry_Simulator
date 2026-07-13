@@ -483,12 +483,14 @@ APP_HTML = r'''
     return 1.05 + ch.balance*5.7 + (ch.h-1)*0.35;
   }
   function solveChromateEquilibrium(source){
-    const tempEffect = (state.temp-45)/85;
-    const acidEffect = -(source.h-1.0)*0.42;
-    const dilutionEffect = source.dilution*0.22;
-    const raw = 0.56 + tempEffect + acidEffect + dilutionEffect;
-    const balance = clamp(raw, 0.08, 0.94);
-    return {balance, h:source.h};
+    // 다이크로메이트/크로메이트도 최종 평형 상태에서는 반드시 Q = K가 되도록 맞춘다.
+    // 이전 버전은 색상 비율(balance)을 경험식으로 계산하고 Q를 따로 계산해서,
+    // 최종 표시값에서 K와 Q가 약간 어긋날 수 있었다.
+    // 여기서는 chromateQ(balance, h) = chromateK()가 되도록 balance를 역산한다.
+    const K = chromateK();
+    const h = source.h;
+    const balance = clamp((K - 1.05 - (h-1)*0.35) / 5.7, 0.08, 0.94);
+    return {balance, h};
   }
 
   function startTransition(target, reason='condition'){
