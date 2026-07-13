@@ -103,17 +103,72 @@ APP_HTML = r'''
   .danger-text{color:var(--pink);font-weight:900;}
   .eq-mark{color:#0e74d4;font-weight:950;}
 
-  /* 모바일 전용 탭 인터페이스: 아이폰/아이패드 세로 화면에서 조건·실험·결과를 나누어 보여준다. */
+  /* 화면 폭이 충분한 태블릿 가로 화면에서는 PC처럼 조건·실험·결과를 동시에 보되, UI를 압축한다. */
   .mobile-tabs{display:none;gap:7px;grid-template-columns:1fr 1fr 1fr;}
   .mobile-tab{height:38px;border-radius:14px;background:#ffffff;color:#42516a;border:1px solid #d7e6f6;box-shadow:0 8px 18px rgba(89,114,148,.10);font-size:13px;font-weight:950;}
   .mobile-tab.active{background:#192235;color:#ffffff;border-color:#192235;}
-  @media (max-width:820px){
+
+  @media (min-width:900px) and (max-width:1200px){
     html,body{overflow:hidden;touch-action:manipulation;}
-    .app{height:860px;padding:8px;gap:8px;overflow:hidden;background:linear-gradient(160deg,#fffaf4 0%,#f2fbff 46%,#f8f7ff 100%);}
+    .app{height:860px;padding:8px;gap:7px;overflow:hidden;background:linear-gradient(160deg,#fffaf4 0%,#f2fbff 46%,#f8f7ff 100%);}
+    .topbar{grid-template-columns:minmax(255px,300px) minmax(0,1fr);gap:8px;min-height:52px;}
+    .title-card{padding:9px 11px;border-radius:18px;min-height:52px;}
+    .logo{font-size:22px;}
+    h1{font-size:20px;letter-spacing:-.95px;}
+    .select-card{padding:8px 10px;border-radius:18px;gap:8px;}
+    .select-label{font-size:12.3px;}
+    .experiment-select{height:34px;border-radius:10px;font-size:11.5px;padding:0 8px;}
+    .mobile-tabs{display:none !important;}
+    .main{display:grid;grid-template-columns:minmax(218px,245px) minmax(0,1.02fr) minmax(0,1.12fr);gap:8px;flex:1;min-height:0;overflow:hidden;}
+    .panel{padding:9px;overflow:hidden;border-radius:20px;}
+    .stage-card{padding:9px;overflow:hidden;border-radius:20px;}
+    .result-card{padding:9px;overflow:hidden;border-radius:20px;}
+    .panel-scroll{height:100%;overflow:auto;padding-right:4px;}
+    .panel h2,.result-card h2{font-size:18px;margin-bottom:7px;line-height:1.12;}
+    .control-section{padding:8px;margin-bottom:7px;border-radius:14px;}
+    .section-title{font-size:12.4px;margin-bottom:6px;}
+    .equation-pill{font-size:11.7px;padding:6px 7px;border-radius:10px;}
+    label.radio{font-size:12px;gap:5px;line-height:1.25;}
+    .radio-row{gap:5px;margin:6px 0 7px;}
+    .range-wrap{margin:8px 0;}
+    .range-label{font-size:11.4px;margin-bottom:3px;}
+    input[type=range]{height:22px;}
+    .inline-select{height:34px;font-size:12px;border-radius:9px;}
+    .button-row{gap:6px;margin-top:6px;}
+    button{height:34px;font-size:12px;border-radius:10px;}
+    .small-check{font-size:11.7px;margin-top:6px;line-height:1.3;}
+    .stage-head{margin-bottom:6px;gap:5px;}
+    .stage-title{font-size:14px;line-height:1.18;letter-spacing:-.55px;}
+    .legend{gap:4px;}
+    .legend-chip{font-size:9.8px;padding:4px 6px;}
+    .legend-dot{width:7px;height:7px;margin-right:3px;}
+    .stage-canvas-wrap{flex:1;min-height:0;border-radius:18px;}
+    .stage-caption{bottom:7px;gap:5px;}
+    .caption-pill{font-size:10.5px;padding:5px 8px;}
+    .result-grid{grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px;}
+    .metric{padding:7px;border-radius:12px;}
+    .metric .label{font-size:10.7px;margin-bottom:3px;}
+    .metric .value{font-size:14.5px;}
+    .badges{gap:5px;margin:4px 0 7px;}
+    .badge{font-size:10.6px;padding:5px 7px;}
+    .formula{font-size:10.9px;line-height:1.35;padding:7px;margin-bottom:7px;border-radius:12px;}
+    .formula code{font-size:10.6px;}
+    .mini-table{font-size:10.5px;margin-bottom:7px;border-radius:11px;}
+    .mini-table th,.mini-table td{padding:4px 4px;}
+    .chart-grid{grid-template-columns:1fr;gap:7px;}
+    .chart-card{padding:6px 7px;border-radius:13px;}
+    .chart-title{font-size:11.8px;margin-bottom:1px;}
+    canvas.chart{height:124px;}
+  }
+
+  /* 아이폰, 아이패드 세로 화면처럼 폭이 좁은 경우에는 탭을 사용한다. */
+  @media (max-width:899px){
+    html,body{overflow:hidden;touch-action:manipulation;}
+    .app{height:860px;padding:10px;gap:8px;overflow:hidden;background:linear-gradient(160deg,#fffaf4 0%,#f2fbff 46%,#f8f7ff 100%);}
     .topbar{grid-template-columns:1fr;gap:8px;min-height:0;}
     .title-card{padding:10px 12px;border-radius:18px;min-height:54px;}
     .logo{font-size:22px;}
-    h1{font-size:20px;letter-spacing:-.9px;}
+    h1{font-size:21px;letter-spacing:-.9px;}
     .select-card{padding:9px 10px;border-radius:18px;display:grid;grid-template-columns:74px 1fr;align-items:center;gap:8px;}
     .select-label{font-size:12.5px;}
     .experiment-select{height:35px;border-radius:10px;font-size:11.7px;padding:0 8px;}
@@ -162,9 +217,7 @@ APP_HTML = r'''
     canvas.chart{height:122px;}
   }
 
-  @media (min-width:821px) and (max-width:1200px){
-    .app{height:auto;overflow:auto}.main{grid-template-columns:1fr}.topbar{grid-template-columns:1fr}.stage-canvas-wrap{min-height:430px}.chart-grid{grid-template-columns:1fr}.subtitle{white-space:normal;}
-  }
+  /* 900~1200px은 축소 3단 레이아웃, 899px 이하는 탭 레이아웃을 사용한다. */
 </style>
 </head>
 <body>
