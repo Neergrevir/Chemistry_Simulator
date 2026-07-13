@@ -288,12 +288,23 @@ APP_HTML = r'''
     if(state.vessel==='steel') return v;
     return clamp(v / Math.sqrt(state.pressure), .85, 4.30);
   }
-  function setVolumeAnimated(newVolume){
+  function setVolumeAnimated(newVolume, duration=900){
     const from = state.displayVolume ?? state.volume;
     const to = clamp(newVolume, 1.00, 4.00);
     state.volume = to;
     $('volume').value = to;
-    state.volumeAnim = {from, to, start:performance.now(), duration:900};
+    state.volumeAnim = {from, to, start:performance.now(), duration};
+  }
+  function animatePistonByEquilibrium(startGas,targetGas){
+    if(state.experiment!=='gas' || state.vessel!=='cylinder') return;
+    const startTotal = startGas.no2 + startGas.n2o4 + state.inert;
+    const targetTotal = targetGas.no2 + targetGas.n2o4 + state.inert;
+    const deltaMoles = targetTotal - startTotal;
+    if(Math.abs(deltaMoles)<0.015) return;
+    // 일정 압력 피스톤에서는 전체 기체 몰수 변화가 부피 변화로 이어지도록 시각화한다.
+    // 정반응(2NO₂ -> N₂O₄)은 몰수가 줄어 피스톤이 내려가고, 역반응은 올라간다.
+    const visualDelta = deltaMoles * 0.72;
+    setVolumeAnimated(state.volume + visualDelta, 1700);
   }
   function gasK(temp=state.temp){
     // 2NO2 -> N2O4는 발열 반응이므로 온도가 높을수록 K가 작아지도록 설정한다.
@@ -344,6 +355,7 @@ APP_HTML = r'''
       const q0 = gasQ(start), k1 = gasK(), rf0 = rateForwardGas(start), rr0 = rateReverseGas(start);
       const rf1 = rateForwardGas(target), rr1 = rateReverseGas(target);
       state.chart = {qStart:q0, qEnd:k1, kStart:k1, kEnd:k1, rfStart:rf0, rfEnd:(rf1+rr1)/2, rrStart:rr0, rrEnd:(rf1+rr1)/2, start:now, duration};
+      animatePistonByEquilibrium(start,target);
     } else {
       const start = {...state.displayChromate};
       state.targetChromate = {...target};
@@ -570,6 +582,11 @@ APP_HTML = r'''
     ctx.fillStyle='rgba(255,255,255,.32)';
     ctx.beginPath(); ctx.ellipse(centerX,liquidY,beakerW*.42,14,0,0,Math.PI*2); ctx.fill();
 
+    // 비커 아래 상태 문구를 예전 방식으로 복원한다. 단, '중간 평형 색'은 '중간색'으로 단순화한다.
+    const label = b>.66 ? 'CrO₄²⁻ 증가 · 노란색' : (b<.38 ? 'Cr₂O₇²⁻ 증가 · 주황색' : '중간색');
+    ctx.fillStyle='#405066'; ctx.font='900 19px Segoe UI, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(label,centerX,topY+beakerH+34);
+
     drawThermometer(ctx,Math.min(W-82, centerX+beakerW/2+112), topY+24, state.temp);
     ctx.restore();
   }
@@ -711,8 +728,7 @@ APP_HTML = r'''
       $('formula').innerHTML='<b>계산식</b><br><code>Cr₂O₇²⁻ + H₂O ⇌ 2CrO₄²⁻ + 2H⁺</code><br><code>산성: H⁺ 증가 → 왼쪽 이동</code><br><code>염기성: H⁺ 감소 → 오른쪽 이동</code>';
       const orange=(1-b), yellow=b;
       $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(state.displayChromate.h,2)}</td><td>${fmt(state.targetChromate.h,2)}</td><td>산성도</td></tr>`;
-      const colorLabel = b>.66 ? '노란색' : (b<.38 ? '주황색' : '중간색');
-      $('caption').innerHTML=`<span class="caption-pill">${colorLabel}</span><span class="caption-pill">용액 색 변화를 관찰합니다.</span>`;
+      $('caption').innerHTML='';
     }
   }
 
