@@ -476,7 +476,8 @@ APP_HTML = r'''
     return {no2:Math.max(total-2*n2o4,0.0001), n2o4:Math.max(n2o4,0.0001)};
   }
   function chromateK(){
-    return clamp(2.4 + state.temp/45 + (state.chromate.dilution*0.35), 1.2, 7.2);
+    // H2O 첨가는 희석과 H+ 감소를 통해 오른쪽(크로메이트, 노란색) 이동이 분명히 보이도록 반영한다.
+    return clamp(2.4 + state.temp/45 + (state.chromate.dilution*1.35), 1.2, 8.4);
   }
   function chromateQ(ch=state.displayChromate){
     // 교육용 표현: 균형 비율을 Q값으로 대응시켜 K와 만나는 지점을 선명하게 보여준다.
@@ -982,7 +983,7 @@ APP_HTML = r'''
     const amt=Number($('chromateAmount').value); const act=$('chromateAction').value;
     if(act==='hcl') state.chromate.h=clamp(state.chromate.h + amt*1.25,.15,2.8);
     if(act==='naoh') state.chromate.h=clamp(state.chromate.h - amt*1.35,.15,2.8);
-    if(act==='water'){ state.chromate.h=clamp(state.chromate.h - amt*.18,.15,2.8); state.chromate.dilution=clamp(state.chromate.dilution+amt*.45,0,1.2); }
+    if(act==='water'){ state.chromate.h=clamp(state.chromate.h - amt*.60,.15,2.8); state.chromate.dilution=clamp(state.chromate.dilution+amt*.70,0,1.6); }
     startTransition(solveChromateEquilibrium(state.chromate));
   });
   $('resetChromate').addEventListener('click',resetChromate);
