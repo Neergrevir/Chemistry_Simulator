@@ -570,12 +570,12 @@ APP_HTML = r'''
     const transitionT = state.anim && state.anim.type==='chromate' ? clamp((now-state.anim.startT)/state.anim.duration,0,1) : 1;
     const settling = state.anim && state.anim.type==='chromate' ? (1-transitionT) : .18;
     const waveAmp = 3.2 + settling*6.5 + (state.temp/120)*1.6;
-    const waveTime = now*.0042;
+    const waveTime = now*.0028;
     function surfaceY(px){
       const u = (px-leftTop)/(rightTop-leftTop);
       return liquidY
         + Math.sin(u*Math.PI*2.15 + waveTime)*waveAmp
-        + Math.sin(u*Math.PI*4.5 - waveTime*1.25)*(waveAmp*.32);
+        + Math.sin(u*Math.PI*4.5 - waveTime*1.05)*(waveAmp*.32);
     }
     function liquidPath(){
       ctx.beginPath();
@@ -626,7 +626,7 @@ APP_HTML = r'''
     ctx.beginPath();
     for(let i=0;i<=steps;i++){
       const px = leftTop+24 + (rightTop-leftTop-48)*i/steps;
-      const py = surfaceY(px)+11+Math.sin(i*.5+waveTime)*1.8;
+      const py = surfaceY(px)+11+Math.sin(i*.5+waveTime*.85)*1.8;
       if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
     }
     ctx.stroke();
