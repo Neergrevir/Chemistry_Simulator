@@ -70,7 +70,7 @@ APP_HTML = r'''
   .button-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
   button{border:0;border-radius:11px;background:#151b2b;color:white;height:36px;font-weight:800;cursor:pointer;box-shadow:0 7px 15px rgba(21,27,43,.12);transition:transform .12s ease,opacity .12s ease;}
   button:hover{transform:translateY(-1px)} button.secondary{background:#edf5ff;color:#23649c;border:1px solid #cce4ff;box-shadow:none;}
-  .note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:7px;word-break:keep-all;}
+  .note{display:none;}
   .stage-card{position:relative;padding:14px 14px 12px;overflow:hidden;display:flex;flex-direction:column;min-width:0;}
   .stage-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;min-width:0;}
   .stage-title{font-weight:950;font-size:17px;letter-spacing:-.7px;line-height:1.24;word-break:keep-all;min-width:0;}
@@ -79,7 +79,7 @@ APP_HTML = r'''
   .legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;}
   .stage-canvas-wrap{position:relative;flex:1;min-height:455px;border:1px solid #dbe8f6;border-radius:24px;background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.98),rgba(239,248,255,.78));overflow:hidden;}
   #stageCanvas{display:block;width:100%;height:100%;}
-  .stage-caption{position:absolute;left:22px;right:22px;bottom:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;pointer-events:none;}
+  .stage-caption{display:none;}
   .caption-pill{background:rgba(255,255,255,.80);backdrop-filter:blur(9px);border:1px solid #d5e6f7;border-radius:999px;padding:7px 11px;font-size:12.3px;font-weight:900;color:#4b5a70;box-shadow:0 7px 18px rgba(91,120,150,.08);white-space:nowrap;}
   .result-card{padding:14px;overflow:hidden;min-width:0;}
   .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
@@ -96,7 +96,7 @@ APP_HTML = r'''
   .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .chart-card{border:1px solid #e2ebf5;background:white;border-radius:16px;padding:8px 9px;min-width:0;}
   .chart-title{font-weight:950;font-size:13.5px;margin-bottom:2px;letter-spacing:-.45px;line-height:1.2;}
-  .chart-sub{font-size:11.3px;color:#768397;margin-bottom:3px;}
+  .chart-sub{display:none;}
   canvas.chart{display:block;width:100%;height:154px;}
   .hidden{display:none !important;}
   .small-check{display:flex;gap:7px;align-items:flex-start;font-size:13px;color:#4e5c70;margin-top:8px;line-height:1.42;}
@@ -152,7 +152,7 @@ APP_HTML = r'''
             <div class="range-label"><span>용기 부피 (L)</span><span id="volumeVal" class="range-value">2.50</span></div>
             <input id="volume" type="range" min="1.00" max="4.00" step="0.01" value="2.50" />
           </div>
-          <div class="note" id="containerNote">실린더는 압력 변화에 따라 피스톤 위치가 함께 변합니다.</div>
+          <div class="note" id="containerNote"></div>
         </div>
 
         <div id="gasControls" class="control-section">
@@ -189,7 +189,6 @@ APP_HTML = r'''
             <button id="applyChromate">적용</button>
             <button id="resetChromate" class="secondary">초기화</button>
           </div>
-          <div class="note">다이크로메이트 실험은 용액 색 변화 중심으로 표현하며, 분자 운동 애니메이션은 표시하지 않습니다.</div>
         </div>
       </div>
     </aside>
@@ -222,12 +221,12 @@ APP_HTML = r'''
       <div class="chart-grid">
         <div class="chart-card">
           <div class="chart-title">Q와 K의 실시간 변화</div>
-          <div class="chart-sub">5초 안에 평형 도달</div>
+          
           <canvas id="qkChart" class="chart"></canvas>
         </div>
         <div class="chart-card">
           <div class="chart-title">정반응 속도와 역반응 속도</div>
-          <div class="chart-sub">평형에서 두 속도가 같아짐</div>
+          
           <canvas id="rateChart" class="chart"></canvas>
         </div>
       </div>
@@ -419,16 +418,21 @@ APP_HTML = r'''
   }
 
   function drawThermometer(g,x,y,temp){
-    const h=260, bulb=47, tubeW=31;
-    g.strokeStyle='#8f9dae';g.lineWidth=9;g.lineCap='round';
+    const h=245, bulb=34, tubeW=24;
+    const bulbCenterY = y+h-bulb+10;
+    g.strokeStyle='#8f9dae';g.lineWidth=7;g.lineCap='round';
     g.beginPath();g.moveTo(x,y+h-bulb);g.lineTo(x,y+20);g.stroke();
     g.fillStyle='#ff5b73';
-    const fillH = clamp(42 + temp/120*185, 42, 230);
-    g.beginPath();g.roundRect ? g.roundRect(x-tubeW/2+4,y+h-bulb-fillH+26,tubeW-8,fillH,9) : g.rect(x-tubeW/2+4,y+h-bulb-fillH+26,tubeW-8,fillH); g.fill();
-    g.beginPath();g.arc(x,y+h-bulb+16,bulb,0,Math.PI*2);g.fill();
-    g.strokeStyle='#8f9dae';g.lineWidth=7;g.beginPath();g.arc(x,y+h-bulb+16,bulb+9,0,Math.PI*2);g.stroke();
-    g.fillStyle='#3e4a5d';g.font='900 23px Segoe UI, sans-serif';g.textAlign='center';
-    g.fillText(Math.round(temp)+'°C',x,y+h+38);
+    const fillH = clamp(34 + temp/120*175, 34, 210);
+    const tubeX = x-tubeW/2+4;
+    const tubeY = y+h-bulb-fillH+22;
+    g.beginPath();
+    g.roundRect ? g.roundRect(tubeX,tubeY,tubeW-8,fillH,8) : g.rect(tubeX,tubeY,tubeW-8,fillH);
+    g.fill();
+    g.beginPath();g.arc(x,bulbCenterY,bulb,0,Math.PI*2);g.fill();
+    g.strokeStyle='#8f9dae';g.lineWidth=6;g.beginPath();g.arc(x,bulbCenterY,bulb+7,0,Math.PI*2);g.stroke();
+    g.fillStyle='#3e4a5d';g.font='900 20px Segoe UI, sans-serif';g.textAlign='center';
+    g.fillText(Math.round(temp)+'°C',x,y+h+28);
   }
 
   function drawGasStage(W,H){
@@ -483,13 +487,8 @@ APP_HTML = r'''
     }
     for(const m of state.molecules) drawGasMolecule(ctx,m,1);
 
-    const tx = Math.min(W-96, pg.x+pg.w+110);
-    drawThermometer(ctx,tx,pg.y+40,state.temp);
-    const direction = directionFrom(gasQ(), gasK());
-    ctx.textAlign='center';ctx.fillStyle='#4b5a70';ctx.font='950 18px Segoe UI, sans-serif';
-    ctx.fillText(state.vessel==='cylinder'?'피스톤 실린더':'강철용기',pg.x+pg.w/2,pg.y+pg.h+34);
-    ctx.font='800 14px Segoe UI, sans-serif';
-    ctx.fillText(`${fmt(state.pressure,2)} atm  ·  ${fmt(effectiveVolume(),2)} L  ·  ${direction}`,pg.x+pg.w/2,pg.y+pg.h+58);
+    const tx = Math.min(W-86, pg.x+pg.w+105);
+    drawThermometer(ctx,tx,pg.y+46,state.temp);
   }
 
   function drawChromateStage(W,H){
@@ -544,10 +543,7 @@ APP_HTML = r'''
     ctx.fillStyle='rgba(255,255,255,.32)';
     ctx.beginPath(); ctx.ellipse(centerX,liquidY,beakerW*.42,14,0,0,Math.PI*2); ctx.fill();
 
-    const label = b>.66 ? 'CrO₄²⁻ 증가 · 노란색' : (b<.38 ? 'Cr₂O₇²⁻ 증가 · 주황색' : '중간 평형 색');
-    ctx.fillStyle='#405066'; ctx.font='900 19px Segoe UI, sans-serif'; ctx.textAlign='center';
-    ctx.fillText(label,centerX,topY+beakerH+34);
-    drawThermometer(ctx,Math.min(W-82, centerX+beakerW/2+112), topY+18, state.temp);
+    drawThermometer(ctx,Math.min(W-82, centerX+beakerW/2+112), topY+24, state.temp);
     ctx.restore();
   }
 
@@ -654,7 +650,7 @@ APP_HTML = r'''
     if(state.experiment==='gas'){
       $('leftEquation').textContent='2NO₂(g) ⇌ N₂O₄(g)';
       $('stageTitle').textContent='2NO₂(g) ⇌ N₂O₄(g)';
-      $('containerNote').textContent=state.vessel==='cylinder'?'실린더는 압력 변화에 따라 피스톤 위치가 함께 변합니다.':'강철용기는 부피가 일정하므로 피스톤 이동을 표시하지 않습니다.';
+      $('containerNote').textContent='';
       $('legend').innerHTML='<span class="legend-chip"><span class="legend-dot" style="background:#d97836"></span>NO₂ 적갈색</span><span class="legend-chip"><span class="legend-dot" style="background:#eef5ff;border:1px solid #7d8ea1"></span>N₂O₄ 무색</span>';
       const K=gasK(), Q=gasQ(), dir=directionFrom(Q,K), V=effectiveVolume();
       $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent=fmt(V,2)+' L';
@@ -665,19 +661,19 @@ APP_HTML = r'''
         ['NO₂', state.displayGas.no2, eq.no2, state.displayGas.no2/V], ['N₂O₄', state.displayGas.n2o4, eq.n2o4, state.displayGas.n2o4/V]
       ];
       $('tableBody').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],3)} mol</td><td>${fmt(r[2],3)} mol</td><td>${fmt(r[3],3)} M</td></tr>`).join('');
-      $('caption').innerHTML=`<span class="caption-pill">${state.vessel==='cylinder'?'실린더':'강철용기'}</span><span class="caption-pill">${fmt(state.pressure,2)} atm</span><span class="caption-pill">${fmt(V,2)} L</span><span class="caption-pill">${Math.round(state.temp)}°C</span>`;
+      $('caption').innerHTML='';
     } else {
       $('leftEquation').textContent='Cr₂O₇²⁻ + H₂O ⇌ 2CrO₄²⁻ + 2H⁺';
       $('stageTitle').textContent='Cr₂O₇²⁻(aq) + H₂O(l) ⇌ 2CrO₄²⁻(aq) + 2H⁺(aq)';
-      $('containerNote').textContent='다이크로메이트 실험은 비커 속 용액의 색 변화를 중심으로 관찰합니다.';
+      $('containerNote').textContent='';
       $('legend').innerHTML='<span class="legend-chip"><span class="legend-dot" style="background:#df7b32"></span>Cr₂O₇²⁻ 주황색</span><span class="legend-chip"><span class="legend-dot" style="background:#f7d84d"></span>CrO₄²⁻ 노란색</span>';
       const K=chromateK(), Q=chromateQ(), dir=directionFrom(Q,K), b=state.displayChromate.balance;
       $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent='비커';
-      $('badges').innerHTML=`<span class="badge">${b>.66?'CrO₄²⁻ 증가':b<.38?'Cr₂O₇²⁻ 증가':'중간 상태'}</span><span class="badge">${b>.66?'노란색':b<.38?'주황색':'주황-노랑'}</span>`;
+      $('badges').innerHTML=`<span class="badge">${b>.66?'CrO₄²⁻ 증가':b<.38?'Cr₂O₇²⁻ 증가':'색 변화 중'}</span>`;
       $('formula').innerHTML='<b>계산식</b><br><code>Cr₂O₇²⁻ + H₂O ⇌ 2CrO₄²⁻ + 2H⁺</code><br><code>산성: H⁺ 증가 → 왼쪽 이동</code><br><code>염기성: H⁺ 감소 → 오른쪽 이동</code><br><span class="eq-mark">그래프에서 Q가 K에 닿는 지점이 평형입니다.</span>';
       const orange=(1-b), yellow=b;
       $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(state.displayChromate.h,2)}</td><td>${fmt(state.targetChromate.h,2)}</td><td>산성도</td></tr>`;
-      $('caption').innerHTML=`<span class="caption-pill">비커</span><span class="caption-pill">${Math.round(state.temp)}°C</span><span class="caption-pill">${b>.66?'노란색 뚜렷':b<.38?'주황색 뚜렷':'중간 색'}</span>`;
+      $('caption').innerHTML='';
     }
   }
 
