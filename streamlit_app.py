@@ -443,13 +443,13 @@ APP_HTML = r'''
     $('volume').value = to;
     state.volumeAnim = {from, to, start:performance.now(), duration};
   }
-  function triggerGasDensityPulse(compressionSignal, duration=1750, maxAmount=.24){
+  function triggerGasDensityPulse(compressionSignal, duration=1650, maxAmount=.15){
     if(state.experiment!=='gas') return;
     if(!Number.isFinite(compressionSignal) || Math.abs(compressionSignal)<0.0001) return;
     // compressionSignal > 0 : 압축/압력 증가 → NO₂ 농도 순간 증가 → 잠깐 진해짐
     // compressionSignal < 0 : 팽창/압력 감소 → NO₂ 농도 순간 감소 → 잠깐 옅어짐
     // 슬라이더가 0.01 단위로 움직여도 눈에 보이도록 제곱근으로 감도를 높인다.
-    // H₂ 첨가처럼 색 변화가 약하게 보이는 상황에서는 maxAmount를 더 크게 줄 수 있다.
+    // 순간 색 변화는 실제 농도 변화의 느낌만 주도록 작게 제한한다.
     const signedStrength = Math.sign(compressionSignal) * clamp(Math.sqrt(Math.abs(compressionSignal)), 0, 1);
     state.volumePulse = {amount:signedStrength*maxAmount, start:performance.now(), duration};
   }
@@ -651,7 +651,7 @@ APP_HTML = r'''
     let pulseBrown = 0;
     if(state.volumePulse){
       const pt = clamp((performance.now()-state.volumePulse.start)/state.volumePulse.duration,0,1);
-      pulseBrown = state.volumePulse.amount * (1-ease(pt));
+      pulseBrown = state.volumePulse.amount * 0.85 * (1-ease(pt));
       if(pt>=1) state.volumePulse=null;
     }
     const brownAlpha = clamp(equilibriumBrown*.78 + concentrationBrown*.22 + pulseBrown, .08, .86);
@@ -985,7 +985,7 @@ APP_HTML = r'''
       // 압력 증가: 순간 압축으로 NO₂ 농도가 커져 잠깐 진해진 뒤,
       // 평형 이동 과정에서 N₂O₄ 쪽으로 이동하며 다시 옅어진다.
       // 압력 감소는 반대로 순간적으로 옅어진 뒤 NO₂ 쪽으로 이동한다.
-      triggerGasDensityPulse((nextPressure-prevPressure)*1.15, 1750);
+      triggerGasDensityPulse((nextPressure-prevPressure)*0.85, 1550, .14);
     }
     applyConditionChange();
   });
@@ -998,7 +998,7 @@ APP_HTML = r'''
     if(state.experiment==='gas'){
       // 부피 감소: 순간 압축으로 더 진해짐 → 이후 평형 이동으로 연해짐.
       // 부피 증가: 순간 팽창으로 더 옅어짐 → 이후 평형 이동으로 진해짐.
-      triggerGasDensityPulse((prevVolume-nextVolume)*1.05, 1750);
+      triggerGasDensityPulse((prevVolume-nextVolume)*0.78, 1550, .14);
     }
     applyConditionChange();
   });
@@ -1017,8 +1017,8 @@ APP_HTML = r'''
       state.inert=clamp(state.inert+amt,0,4.0);
       // H₂ 비활성 기체는 평형식에는 들어가지 않지만, 피스톤 용기에서는 순간 팽창으로
       // NO₂ 농도가 낮아져 색이 잠깐 옅어지는 효과가 나타난다.
-      // 기존보다 과장된 시각 펄스를 주어 작은 첨가량에서도 색 변화가 보이게 한다.
-      triggerGasDensityPulse(-amt*2.4, 2400, .38);
+      // 색 변화가 너무 인위적으로 튀지 않도록 완만한 시각 펄스만 준다.
+      triggerGasDensityPulse(-amt*1.35, 1900, .20);
     }
 
     if(state.vessel==='cylinder'){
