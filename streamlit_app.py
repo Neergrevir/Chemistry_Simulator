@@ -444,14 +444,10 @@ APP_HTML = r'''
   }
   function animatePistonByEquilibrium(startGas,targetGas){
     if(state.experiment!=='gas' || state.vessel!=='cylinder') return;
-    const startTotal = startGas.no2 + startGas.n2o4 + state.inert;
-    const targetTotal = targetGas.no2 + targetGas.n2o4 + state.inert;
-    const deltaMoles = targetTotal - startTotal;
-    if(Math.abs(deltaMoles)<0.015) return;
-    // 일정 압력 피스톤에서는 전체 기체 몰수 변화가 부피 변화로 이어지도록 시각화한다.
-    // 정반응(2NO₂ -> N₂O₄)은 몰수가 줄어 피스톤이 내려가고, 역반응은 올라간다.
-    const visualDelta = deltaMoles * 0.72;
-    setVolumeAnimated(state.volume + visualDelta, 1700);
+    // 평형 이동에 따른 피스톤 움직임은 state.volume을 직접 바꾸지 않는다.
+    // state.volume을 바꿔 버리면 이미 계산한 평형 조성과 다른 부피가 적용되어 K와 Q가 어긋난다.
+    // 대신 drawStage → visualEffectiveVolume()이 displayGas의 전체 몰수 변화를 읽어
+    // V ∝ nT/P 방식으로 피스톤 위치를 자연스럽게 움직이게 한다.
   }
   function gasK(temp=state.temp){
     // 2NO2 -> N2O4는 발열 반응이므로 온도가 높을수록 K가 작아지도록 설정한다.
@@ -463,13 +459,16 @@ APP_HTML = r'''
     return cN2O4/(cNO2*cNO2);
   }
   function solveGasEquilibrium(sourceGas){
-    const V = effectiveVolume(sourceGas);
     const K = gasK();
     const total = Math.max(sourceGas.no2 + 2*sourceGas.n2o4, .08);
     let lo=0, hi=total/2-1e-5;
-    for(let i=0;i<80;i++){
+    for(let i=0;i<90;i++){
       const b=(lo+hi)/2;
       const a=Math.max(total-2*b,1e-7);
+      // 피스톤 용기에서는 부피가 최종 평형 조성의 전체 몰수에 따라 달라진다.
+      // 따라서 sourceGas의 부피를 고정해서 풀면 최종 표시 Q가 K와 달라질 수 있다.
+      const trialGas = {no2:a, n2o4:b};
+      const V = effectiveVolume(trialGas, state.volume);
       const val = b*V/(a*a);
       if(val < K) lo=b; else hi=b;
     }
@@ -499,9 +498,9 @@ APP_HTML = r'''
       const start = {...state.displayGas};
       state.targetGas = {...target};
       state.anim = {type:'gas', start, target:{...target}, startT:now, duration};
-      const q0 = gasQ(start), k1 = gasK(), rf0 = rateForwardGas(start), rr0 = rateReverseGas(start);
+      const q0 = gasQ(start), k1 = gasK(), q1 = gasQ(target), rf0 = rateForwardGas(start), rr0 = rateReverseGas(start);
       const rf1 = rateForwardGas(target), rr1 = rateReverseGas(target);
-      state.chart = {qStart:q0, qEnd:k1, kStart:k1, kEnd:k1, rfStart:rf0, rfEnd:(rf1+rr1)/2, rrStart:rr0, rrEnd:(rf1+rr1)/2, start:now, duration};
+      state.chart = {qStart:q0, qEnd:q1, kStart:k1, kEnd:k1, rfStart:rf0, rfEnd:(rf1+rr1)/2, rrStart:rr0, rrEnd:(rf1+rr1)/2, start:now, duration};
       animatePistonByEquilibrium(start,target);
     } else {
       const start = {...state.displayChromate};
