@@ -1015,10 +1015,17 @@ APP_HTML = r'''
     if(act==='removeN2O4') src.n2o4=Math.max(.04,src.n2o4-amt);
     if(act==='addInert'){
       state.inert=clamp(state.inert+amt,0,4.0);
-      // H₂ 비활성 기체는 평형식에는 들어가지 않지만, 피스톤 용기에서는 순간 팽창으로
-      // NO₂ 농도가 낮아져 색이 잠깐 옅어지는 효과가 나타난다.
-      // 색 변화가 너무 인위적으로 튀지 않도록 완만한 시각 펄스만 준다.
-      triggerGasDensityPulse(-amt*1.35, 1900, .20);
+      if(state.vessel==='cylinder'){
+        // 일정 외부 압력의 피스톤 실린더에서는 H₂가 부피를 늘려
+        // NO₂와 N₂O₄의 농도를 낮춘다. 따라서 순간적으로 옅어지고,
+        // 이후 역반응으로 NO₂가 늘며 다시 진해지는 과정을 표현한다.
+        triggerGasDensityPulse(-amt*1.35, 1900, .20);
+      } else {
+        // 정적 강철용기는 부피가 일정하다. 비활성 기체를 넣어도
+        // NO₂와 N₂O₄의 몰수·몰농도·부분압력은 변하지 않으므로 Q와 평형 조성,
+        // 그리고 기체 색은 변하지 않아야 한다.
+        state.volumePulse=null;
+      }
     }
 
     if(state.vessel==='cylinder'){
@@ -1033,7 +1040,19 @@ APP_HTML = r'''
       if(delta!==0) setVolumeAnimated(beforeVol+delta, 900);
     }
     state.gas={...src};state.displayGas={...src};
-    startTransition(solveGasEquilibrium(src));
+    if(act==='addInert' && state.vessel==='steel'){
+      // 강철용기에서의 비활성 기체 첨가는 반응 성분의 상태를 교란하지 않는다.
+      // 불필요한 평형 전환 애니메이션도 시작하지 않고 현재 K=Q 상태를 유지한다.
+      const q=gasQ(state.displayGas, state.volume);
+      const k=gasK();
+      const rates=gasRates(state.displayGas, state.volume);
+      state.targetGas={...state.displayGas};
+      state.anim=null;
+      state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:rates.forward,rfEnd:rates.forward,rrStart:rates.reverse,rrEnd:rates.reverse,start:performance.now(),duration:5000};
+      updateUI();
+    } else {
+      startTransition(solveGasEquilibrium(src));
+    }
   });
   $('resetGas').addEventListener('click',resetGas);
   $('applyChromate').addEventListener('click',()=>{
