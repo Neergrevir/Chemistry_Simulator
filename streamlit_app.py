@@ -390,6 +390,7 @@ APP_HTML = r'''
     targetChromate:{balance:0.58,h:1.0},
     anim:null,
     volumeAnim:null,
+    volumePulse:null,
     molecules:[],
     staticDots:[],
     lastTime:performance.now(),
@@ -628,7 +629,20 @@ APP_HTML = r'''
   function drawGasStage(W,H){
     const pg = pistonGeometry(W,H);
     const no2Frac = state.displayGas.no2/(state.displayGas.no2+state.displayGas.n2o4+1e-6);
-    const brownAlpha = clamp(.08 + no2Frac*.72, .08, .82);
+    const VforColor = Math.max(effectiveVolume(state.displayGas), .5);
+    const no2Conc = state.displayGas.no2 / VforColor;
+    // 색은 단순 몰분율만이 아니라 부피 변화로 생기는 압력/농도 변화도 함께 반영한다.
+    // 부피 감소 직후에는 NO₂ 농도 증가로 잠깐 더 진해지고,
+    // 시간이 지나 평형이 오른쪽으로 이동하면 NO₂ 비율 감소가 반영되어 다시 옅어진다.
+    const equilibriumBrown = .03 + Math.pow(clamp(no2Frac,0,1), .72) * .92;
+    const concentrationBrown = .05 + clamp(no2Conc / 1.05, 0, 1) * .34;
+    let pulseBrown = 0;
+    if(state.volumePulse){
+      const pt = clamp((performance.now()-state.volumePulse.start)/state.volumePulse.duration,0,1);
+      pulseBrown = state.volumePulse.amount * (1-ease(pt));
+      if(pt>=1) state.volumePulse=null;
+    }
+    const brownAlpha = clamp(equilibriumBrown*.78 + concentrationBrown*.22 + pulseBrown, .08, .86);
     const vesselColor = `rgba(205,128,58,${brownAlpha})`;
 
     if(state.vessel==='cylinder'){
@@ -952,7 +966,20 @@ APP_HTML = r'''
   document.querySelectorAll('input[name="vessel"]').forEach(r=>r.addEventListener('change',e=>{state.vessel=e.target.value;applyConditionChange();}));
   $('temp').addEventListener('input',e=>{state.temp=Number(e.target.value);applyConditionChange();});
   $('pressure').addEventListener('input',e=>{state.pressure=Number(e.target.value);applyConditionChange();});
-  $('volume').addEventListener('input',e=>{state.volume=Number(e.target.value);state.displayVolume=state.volume;state.volumeAnim=null;applyConditionChange();});
+  $('volume').addEventListener('input',e=>{
+    const nextVolume=Number(e.target.value);
+    const prevVolume=state.volume;
+    state.volume=nextVolume;
+    state.displayVolume=state.volume;
+    state.volumeAnim=null;
+    if(state.experiment==='gas'){
+      // 부피 조절로 압력이 변하는 순간의 색 변화도 보이게 한다.
+      // 압축: NO₂ 농도 순간 증가 → 잠깐 진해짐, 팽창: 잠깐 옅어짐.
+      const compression = clamp((prevVolume-nextVolume)/1.2, -1, 1);
+      state.volumePulse={amount:compression*.16, start:performance.now(), duration:1400};
+    }
+    applyConditionChange();
+  });
   $('gasAmount').addEventListener('input',updateUI);
   $('chromateAmount').addEventListener('input',updateUI);
   $('moleculeMotion').addEventListener('change',e=>{state.motion=e.target.checked;});
