@@ -40,64 +40,64 @@ APP_HTML = r'''
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);font-family:Pretendard,Apple SD Gothic Neo,Malgun Gothic,Segoe UI,sans-serif;color:var(--text);overflow:hidden;}
-  .app{width:100%;height:830px;padding:14px;display:flex;flex-direction:column;gap:12px;background:linear-gradient(120deg,#fffaf4 0%,#f2fbff 48%,#f8f7ff 100%);}
-  .topbar{display:grid;grid-template-columns:310px minmax(520px,1fr);gap:14px;align-items:stretch;min-height:74px;}
+  .app{width:100%;height:850px;padding:12px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(120deg,#fffaf4 0%,#f2fbff 48%,#f8f7ff 100%);}
+  .topbar{display:grid;grid-template-columns:minmax(330px,360px) minmax(460px,1fr);gap:10px;align-items:stretch;min-height:66px;}
   .title-card,.select-card,.panel,.stage-card,.result-card{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);}
-  .title-card{padding:16px 20px;display:flex;gap:14px;align-items:center;}
-  .logo{font-size:34px;line-height:1;filter:drop-shadow(0 4px 8px rgba(98,160,210,.22));}
-  h1{font-size:27px;margin:0 0 4px 0;letter-spacing:-1.2px;}
-  .subtitle{font-size:13px;color:var(--muted);line-height:1.35;white-space:nowrap;}
-  .select-card{padding:15px 17px;display:flex;align-items:center;gap:12px;}
+  .title-card{padding:13px 16px;display:flex;gap:10px;align-items:center;min-width:0;}
+  .logo{font-size:28px;line-height:1;filter:drop-shadow(0 4px 8px rgba(98,160,210,.22));flex:0 0 auto;}
+  h1{font-size:24px;margin:0;letter-spacing:-1.2px;line-height:1.1;white-space:nowrap;}
+  .subtitle{display:none;}
+  .select-card{padding:13px 15px;display:flex;align-items:center;gap:10px;min-width:0;}
   .select-label{font-weight:800;color:#334057;white-space:nowrap;}
   select,input[type=range],button{font-family:inherit;}
   .experiment-select{width:100%;height:38px;border:1px solid #d6e5f4;background:#202433;color:white;border-radius:10px;padding:0 12px;font-weight:700;outline:none;}
-  .main{display:grid;grid-template-columns:315px minmax(460px,1fr) minmax(510px,1.05fr);gap:14px;min-height:0;flex:1;}
-  .panel{padding:16px 15px;overflow:hidden;}
+  .main{display:grid;grid-template-columns:minmax(300px,315px) minmax(430px,.95fr) minmax(540px,1.18fr);gap:10px;min-height:0;flex:1;}
+  .panel{padding:14px 13px;overflow:hidden;min-width:0;}
   .panel-scroll{height:100%;overflow:auto;padding-right:3px;}
   .panel-scroll::-webkit-scrollbar{width:8px}.panel-scroll::-webkit-scrollbar-thumb{background:#d7e5f4;border-radius:20px}
-  .panel h2,.result-card h2{margin:0 0 12px 0;font-size:22px;letter-spacing:-.8px;}
-  .control-section{border:1px solid #dfe8f2;background:#fbfdff;border-radius:16px;padding:13px 12px;margin-bottom:12px;}
-  .section-title{font-weight:900;margin-bottom:10px;color:#334057;font-size:14px;}
-  .equation-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #d4e6fa;background:#fff;border-radius:12px;padding:9px 10px;font-weight:900;letter-spacing:-.4px;font-size:14px;}
+  .panel h2,.result-card h2{margin:0 0 10px 0;font-size:21px;letter-spacing:-.8px;line-height:1.15;}
+  .control-section{border:1px solid #dfe8f2;background:#fbfdff;border-radius:16px;padding:12px 11px;margin-bottom:10px;}
+  .section-title{font-weight:900;margin-bottom:8px;color:#334057;font-size:13.5px;line-height:1.25;}
+  .equation-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #d4e6fa;background:#fff;border-radius:12px;padding:8px 9px;font-weight:900;letter-spacing:-.5px;font-size:13.2px;line-height:1.25;max-width:100%;word-break:keep-all;}
   .radio-row{display:flex;flex-direction:column;gap:8px;margin:8px 0 10px;}
-  label.radio{display:flex;align-items:center;gap:8px;font-size:14px;color:#3c4659;line-height:1.35;cursor:pointer;}
+  label.radio{display:flex;align-items:center;gap:7px;font-size:13.4px;color:#3c4659;line-height:1.3;cursor:pointer;word-break:keep-all;}
   input[type=radio],input[type=checkbox]{accent-color:var(--pink);}
   .range-wrap{margin:12px 0;}
-  .range-label{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;font-size:13.5px;color:#39465c;font-weight:700;}
+  .range-label{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;font-size:12.8px;color:#39465c;font-weight:700;gap:6px;}
   .range-value{color:var(--pink);font-weight:900;}
   input[type=range]{width:100%;height:6px;accent-color:var(--pink);}
-  .inline-select{width:100%;height:38px;border:1px solid #d6e1ed;border-radius:10px;padding:0 10px;background:#f4f7fb;color:#263247;font-weight:700;outline:none;}
+  .inline-select{width:100%;height:36px;border:1px solid #d6e1ed;border-radius:10px;padding:0 8px;background:#f4f7fb;color:#263247;font-weight:700;outline:none;font-size:13px;}
   .button-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
   button{border:0;border-radius:11px;background:#151b2b;color:white;height:36px;font-weight:800;cursor:pointer;box-shadow:0 7px 15px rgba(21,27,43,.12);transition:transform .12s ease,opacity .12s ease;}
   button:hover{transform:translateY(-1px)} button.secondary{background:#edf5ff;color:#23649c;border:1px solid #cce4ff;box-shadow:none;}
-  .note{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:8px;}
-  .stage-card{position:relative;padding:16px 16px 14px;overflow:hidden;display:flex;flex-direction:column;min-width:0;}
-  .stage-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}
-  .stage-title{font-weight:950;font-size:19px;letter-spacing:-.6px;}
+  .note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:7px;word-break:keep-all;}
+  .stage-card{position:relative;padding:14px 14px 12px;overflow:hidden;display:flex;flex-direction:column;min-width:0;}
+  .stage-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;min-width:0;}
+  .stage-title{font-weight:950;font-size:17px;letter-spacing:-.7px;line-height:1.24;word-break:keep-all;min-width:0;}
   .legend{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-  .legend-chip{font-size:12px;font-weight:800;padding:7px 10px;border-radius:999px;background:#f4f8fc;border:1px solid #d6e5f4;color:#5b6b80;}
+  .legend-chip{font-size:11.2px;font-weight:800;padding:6px 8px;border-radius:999px;background:#f4f8fc;border:1px solid #d6e5f4;color:#5b6b80;white-space:nowrap;}
   .legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;}
-  .stage-canvas-wrap{position:relative;flex:1;min-height:445px;border:1px solid #dbe8f6;border-radius:24px;background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.98),rgba(239,248,255,.78));overflow:hidden;}
+  .stage-canvas-wrap{position:relative;flex:1;min-height:455px;border:1px solid #dbe8f6;border-radius:24px;background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.98),rgba(239,248,255,.78));overflow:hidden;}
   #stageCanvas{display:block;width:100%;height:100%;}
   .stage-caption{position:absolute;left:22px;right:22px;bottom:18px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;pointer-events:none;}
-  .caption-pill{background:rgba(255,255,255,.76);backdrop-filter:blur(9px);border:1px solid #d5e6f7;border-radius:999px;padding:8px 13px;font-size:13px;font-weight:900;color:#4b5a70;box-shadow:0 7px 18px rgba(91,120,150,.08);}
-  .result-card{padding:16px;overflow:hidden;min-width:0;}
+  .caption-pill{background:rgba(255,255,255,.80);backdrop-filter:blur(9px);border:1px solid #d5e6f7;border-radius:999px;padding:7px 11px;font-size:12.3px;font-weight:900;color:#4b5a70;box-shadow:0 7px 18px rgba(91,120,150,.08);white-space:nowrap;}
+  .result-card{padding:14px;overflow:hidden;min-width:0;}
   .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
-  .metric{border:1px solid #e2ebf5;background:#fbfdff;border-radius:15px;padding:10px 12px;min-width:0;}
+  .metric{border:1px solid #e2ebf5;background:#fbfdff;border-radius:15px;padding:9px 10px;min-width:0;}
   .metric .label{font-size:12px;color:#6f7e91;font-weight:800;margin-bottom:4px;}
-  .metric .value{font-size:20px;font-weight:950;color:#263248;letter-spacing:-.4px;}
+  .metric .value{font-size:18px;font-weight:950;color:#263248;letter-spacing:-.6px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .badges{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px;}
-  .badge{padding:8px 12px;border-radius:999px;background:#eaf5ff;border:1px solid #c9e3ff;color:#1e629a;font-size:13px;font-weight:900;}
-  .formula{border:1px solid #edf1f6;background:#fbfcff;border-radius:14px;padding:10px 12px;margin-bottom:10px;font-size:13px;line-height:1.55;color:#273246;}
+  .badge{padding:7px 10px;border-radius:999px;background:#eaf5ff;border:1px solid #c9e3ff;color:#1e629a;font-size:12.3px;font-weight:900;line-height:1.2;white-space:nowrap;}
+  .formula{border:1px solid #edf1f6;background:#fbfcff;border-radius:14px;padding:9px 10px;margin-bottom:9px;font-size:12.4px;line-height:1.5;color:#273246;word-break:keep-all;}
   .formula code{font-family:Consolas,Menlo,monospace;font-size:12.5px;color:#1c2b44;}
-  .mini-table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:9px;font-size:12.5px;overflow:hidden;border:1px solid #e2ebf5;border-radius:13px;}
-  .mini-table th,.mini-table td{padding:7px 8px;border-bottom:1px solid #edf2f7;text-align:right;background:white;}
+  .mini-table{width:100%;border-collapse:separate;border-spacing:0;margin-bottom:8px;font-size:12px;overflow:hidden;border:1px solid #e2ebf5;border-radius:13px;}
+  .mini-table th,.mini-table td{padding:6px 7px;border-bottom:1px solid #edf2f7;text-align:right;background:white;white-space:nowrap;}
   .mini-table th:first-child,.mini-table td:first-child{text-align:left}.mini-table tr:last-child td{border-bottom:0}.mini-table th{background:#f7fbff;color:#617084;font-weight:900;}
   .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .chart-card{border:1px solid #e2ebf5;background:white;border-radius:16px;padding:9px 10px;min-width:0;}
-  .chart-title{font-weight:950;font-size:14px;margin-bottom:3px;letter-spacing:-.35px;}
+  .chart-card{border:1px solid #e2ebf5;background:white;border-radius:16px;padding:8px 9px;min-width:0;}
+  .chart-title{font-weight:950;font-size:13.5px;margin-bottom:2px;letter-spacing:-.45px;line-height:1.2;}
   .chart-sub{font-size:11.3px;color:#768397;margin-bottom:3px;}
-  canvas.chart{display:block;width:100%;height:160px;}
+  canvas.chart{display:block;width:100%;height:154px;}
   .hidden{display:none !important;}
   .small-check{display:flex;gap:7px;align-items:flex-start;font-size:13px;color:#4e5c70;margin-top:8px;line-height:1.42;}
   .danger-text{color:var(--pink);font-weight:900;}
@@ -114,7 +114,6 @@ APP_HTML = r'''
       <div class="logo">⚗️</div>
       <div>
         <h1>화학 평형 시뮬레이터</h1>
-        <div class="subtitle">조건 변화에 따른 평형 이동, Q·K 변화, 반응 속도를 실시간으로 관찰합니다.</div>
       </div>
     </div>
     <div class="select-card">
@@ -223,7 +222,7 @@ APP_HTML = r'''
       <div class="chart-grid">
         <div class="chart-card">
           <div class="chart-title">Q와 K의 실시간 변화</div>
-          <div class="chart-sub">5초 안에 Q가 K에 접근하도록 표시</div>
+          <div class="chart-sub">5초 안에 평형 도달</div>
           <canvas id="qkChart" class="chart"></canvas>
         </div>
         <div class="chart-card">
@@ -379,7 +378,7 @@ APP_HTML = r'''
   function makeStaticDots(){
     state.staticDots=[];
     for(let i=0;i<24;i++){
-      state.staticDots.push({x:.18+Math.random()*.64,y:.36+Math.random()*.44,kind:i%3});
+      state.staticDots.push({x:Math.random(),y:Math.random(),kind:i%3});
     }
   }
 
@@ -494,34 +493,62 @@ APP_HTML = r'''
   }
 
   function drawChromateStage(W,H){
-    const cx=W*.44, top=64, bw=Math.min(410,W*.66), bh=360;
-    const x=cx-bw/2, y=top;
+    const centerX = W*.45, topY = H*.15, beakerW=Math.min(390,W*.58), beakerH=Math.min(365,H*.70);
+    const x = centerX - beakerW/2;
     const b=state.displayChromate.balance;
-    const r = Math.round(230*(1-b)+246*b), gg=Math.round(114*(1-b)+217*b), bb=Math.round(42*(1-b)+70*b);
-    // 비커
-    ctx.strokeStyle='#93a2b4';ctx.lineWidth=5;
+    const r = Math.round(235*(1-b)+246*b), gg=Math.round(104*(1-b)+218*b), bb=Math.round(34*(1-b)+70*b);
+
+    ctx.save();
+    drawRoundedRect(ctx, centerX-beakerW/2-18, topY-18, beakerW+36, beakerH+46,26,'rgba(255,255,255,.45)','#dbe7f1',1.5);
+    // 비커 외곽: v4 형태로 복원
+    ctx.strokeStyle='#8ea3b8'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.lineJoin='round';
     ctx.beginPath();
-    ctx.ellipse(cx,y+20,bw*.48,18,0,0,Math.PI*2);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(x+18,y+20);ctx.lineTo(x+45,y+bh);ctx.lineTo(x+bw-45,y+bh);ctx.lineTo(x+bw-18,y+20);ctx.stroke();
-    // 용액
-    const ly=y+125, lh=bh-133;
-    ctx.fillStyle=`rgba(${r},${gg},${bb},.83)`;
+    ctx.moveTo(centerX-beakerW/2, topY);
+    ctx.lineTo(centerX-beakerW/2+26, topY+beakerH);
+    ctx.lineTo(centerX+beakerW/2-26, topY+beakerH);
+    ctx.lineTo(centerX+beakerW/2, topY);
+    ctx.stroke();
+    ctx.strokeStyle='#9fb0c2'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.ellipse(centerX, topY, beakerW/2, 16,0,0,Math.PI*2); ctx.stroke();
+
+    // 용액: 예전 버전처럼 사다리꼴 형태 + 잔잔한 수면으로 표시
+    const liquidH = beakerH*.72;
+    const liquidY = topY+beakerH-liquidH;
+    const grd = ctx.createLinearGradient(0,liquidY,0,topY+beakerH);
+    grd.addColorStop(0,`rgba(${r},${gg},${bb},.82)`);
+    grd.addColorStop(1,`rgba(${Math.min(255,r+10)},${Math.min(255,gg+12)},${Math.min(255,bb+8)},.96)`);
+    ctx.fillStyle=grd;
     ctx.beginPath();
-    ctx.ellipse(cx,ly,bw*.42,17,0,0,Math.PI);
-    ctx.lineTo(x+bw-62,y+bh-8);ctx.lineTo(x+62,y+bh-8);ctx.closePath();ctx.fill();
-    ctx.fillStyle=`rgba(255,255,255,.25)`;ctx.beginPath();ctx.ellipse(cx,ly,bw*.42,17,0,0,Math.PI*2);ctx.fill();
-    // 정지된 이온 점: 움직이지 않음
+    ctx.moveTo(centerX-beakerW/2+18,liquidY);
+    ctx.bezierCurveTo(centerX-beakerW/4,liquidY-10,centerX+beakerW/4,liquidY+10,centerX+beakerW/2-18,liquidY);
+    ctx.lineTo(centerX+beakerW/2-50,topY+beakerH-8);
+    ctx.lineTo(centerX-beakerW/2+50,topY+beakerH-8);
+    ctx.closePath(); ctx.fill();
+    // 용액 영역 클리핑 뒤 정지된 이온 점 표시
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(centerX-beakerW/2+18,liquidY);
+    ctx.bezierCurveTo(centerX-beakerW/4,liquidY-10,centerX+beakerW/4,liquidY+10,centerX+beakerW/2-18,liquidY);
+    ctx.lineTo(centerX+beakerW/2-50,topY+beakerH-8);
+    ctx.lineTo(centerX-beakerW/2+50,topY+beakerH-8);
+    ctx.closePath(); ctx.clip();
     for(const d of state.staticDots){
-      const px=x+bw*d.x, py=y+bh*d.y;
-      ctx.globalAlpha=.55;
-      ctx.fillStyle=d.kind===0?'#c86f31':'#ffe258';
-      ctx.beginPath();ctx.arc(px,py,4.5,0,Math.PI*2);ctx.fill();
+      const px = centerX-beakerW*.34 + d.x*beakerW*.68;
+      const py = liquidY + 22 + d.y*(liquidH-45);
+      ctx.globalAlpha=.56;
+      ctx.fillStyle = d.kind===0?'rgba(211,93,30,.72)':'rgba(255,238,80,.72)';
+      ctx.beginPath(); ctx.arc(px,py,3.7+d.kind*.6,0,Math.PI*2); ctx.fill();
       ctx.globalAlpha=1;
     }
-    const label = b>.66 ? 'CrO₄²⁻ 증가 · 노란색' : (b<.38 ? 'Cr₂O₇²⁻ 증가 · 주황색' : '중간 상태');
-    ctx.fillStyle='#46566d';ctx.font='950 21px Segoe UI, sans-serif';ctx.textAlign='center';
-    ctx.fillText(label,cx,y+bh+45);
-    drawThermometer(ctx,Math.min(W-78,x+bw+120),y+50,state.temp);
+    ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,.32)';
+    ctx.beginPath(); ctx.ellipse(centerX,liquidY,beakerW*.42,14,0,0,Math.PI*2); ctx.fill();
+
+    const label = b>.66 ? 'CrO₄²⁻ 증가 · 노란색' : (b<.38 ? 'Cr₂O₇²⁻ 증가 · 주황색' : '중간 평형 색');
+    ctx.fillStyle='#405066'; ctx.font='900 19px Segoe UI, sans-serif'; ctx.textAlign='center';
+    ctx.fillText(label,centerX,topY+beakerH+34);
+    drawThermometer(ctx,Math.min(W-82, centerX+beakerW/2+112), topY+18, state.temp);
+    ctx.restore();
   }
 
   function chartPoints(now){
@@ -723,4 +750,4 @@ APP_HTML = r'''
 </html>
 '''
 
-components.html(APP_HTML, height=850, scrolling=False)
+components.html(APP_HTML, height=870, scrolling=False)
