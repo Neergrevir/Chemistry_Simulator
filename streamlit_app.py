@@ -108,7 +108,7 @@ APP_HTML = r'''
   .mobile-tab{height:38px;border-radius:14px;background:#ffffff;color:#42516a;border:1px solid #d7e6f6;box-shadow:0 8px 18px rgba(89,114,148,.10);font-size:13px;font-weight:950;}
   .mobile-tab.active{background:#192235;color:#ffffff;border-color:#192235;}
 
-  @media (min-width:900px) and (max-width:1200px){
+  @media (min-width:900px) and (max-width:1200px) and (orientation:landscape) and (min-height:620px){
     html,body{overflow:hidden;touch-action:manipulation;}
     .app{height:860px;padding:8px;gap:7px;overflow:hidden;background:linear-gradient(160deg,#fffaf4 0%,#f2fbff 46%,#f8f7ff 100%);}
     .topbar{grid-template-columns:minmax(255px,300px) minmax(0,1fr);gap:8px;min-height:52px;}
@@ -161,8 +161,8 @@ APP_HTML = r'''
     canvas.chart{height:124px;}
   }
 
-  /* 아이폰, 아이패드 세로 화면처럼 폭이 좁은 경우에는 탭을 사용한다. */
-  @media (max-width:899px){
+  /* 아이폰, 아이패드 세로 화면, 또는 높이가 낮은 가로 화면에서는 탭을 사용한다. */
+  @media (max-width:899px), (min-width:900px) and (max-width:1200px) and (orientation:portrait), (max-width:1200px) and (max-height:619px){
     html,body{overflow:hidden;touch-action:manipulation;}
     .app{height:860px;padding:10px;gap:8px;overflow:hidden;background:linear-gradient(160deg,#fffaf4 0%,#f2fbff 46%,#f8f7ff 100%);}
     .topbar{grid-template-columns:1fr;gap:8px;min-height:0;}
@@ -217,7 +217,10 @@ APP_HTML = r'''
     canvas.chart{height:122px;}
   }
 
-  /* 900~1200px은 축소 3단 레이아웃, 899px 이하는 탭 레이아웃을 사용한다. */
+  /* 화면 규칙
+     - PC 넓은 화면: 기본 3단 레이아웃
+     - 아이패드 가로: 축소 3단 레이아웃
+     - 아이패드 세로 / 아이폰 / 낮은 가로 화면: 탭 레이아웃 */
 </style>
 </head>
 <body>
