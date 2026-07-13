@@ -443,14 +443,15 @@ APP_HTML = r'''
     $('volume').value = to;
     state.volumeAnim = {from, to, start:performance.now(), duration};
   }
-  function triggerGasDensityPulse(compressionSignal, duration=1750){
+  function triggerGasDensityPulse(compressionSignal, duration=1750, maxAmount=.24){
     if(state.experiment!=='gas') return;
     if(!Number.isFinite(compressionSignal) || Math.abs(compressionSignal)<0.0001) return;
     // compressionSignal > 0 : 압축/압력 증가 → NO₂ 농도 순간 증가 → 잠깐 진해짐
     // compressionSignal < 0 : 팽창/압력 감소 → NO₂ 농도 순간 감소 → 잠깐 옅어짐
     // 슬라이더가 0.01 단위로 움직여도 눈에 보이도록 제곱근으로 감도를 높인다.
+    // H₂ 첨가처럼 색 변화가 약하게 보이는 상황에서는 maxAmount를 더 크게 줄 수 있다.
     const signedStrength = Math.sign(compressionSignal) * clamp(Math.sqrt(Math.abs(compressionSignal)), 0, 1);
-    state.volumePulse = {amount:signedStrength*.24, start:performance.now(), duration};
+    state.volumePulse = {amount:signedStrength*maxAmount, start:performance.now(), duration};
   }
   function animatePistonByEquilibrium(startGas,targetGas){
     if(state.experiment!=='gas' || state.vessel!=='cylinder') return;
@@ -679,7 +680,7 @@ APP_HTML = r'''
     const totalMoles = state.displayGas.no2 + state.displayGas.n2o4;
     const no2Need = Math.round(clamp(10 + no2Frac*32, 8, 42));
     const n2o4Need = Math.round(clamp(8 + (1-no2Frac)*22, 5, 30));
-    const h2Need = Math.round(clamp(state.inert*9, 0, 20));
+    const h2Need = Math.round(clamp(state.inert*14, 0, 32));
     let desired = no2Need + n2o4Need + h2Need;
     while(state.molecules.length<desired){
       state.molecules.push({kind:'no2',x:pg.x+45+Math.random()*(pg.w-90),y:pg.gasTop+25+Math.random()*(pg.gasBottom-pg.gasTop-50),vx:Math.random()*2-1,vy:Math.random()*2-1,r:7+Math.random()*2});
@@ -1012,13 +1013,19 @@ APP_HTML = r'''
     if(act==='removeNO2') src.no2=Math.max(.04,src.no2-amt);
     if(act==='addN2O4') src.n2o4+=amt;
     if(act==='removeN2O4') src.n2o4=Math.max(.04,src.n2o4-amt);
-    if(act==='addInert') state.inert=clamp(state.inert+amt,0,4.0);
+    if(act==='addInert'){
+      state.inert=clamp(state.inert+amt,0,4.0);
+      // H₂ 비활성 기체는 평형식에는 들어가지 않지만, 피스톤 용기에서는 순간 팽창으로
+      // NO₂ 농도가 낮아져 색이 잠깐 옅어지는 효과가 나타난다.
+      // 기존보다 과장된 시각 펄스를 주어 작은 첨가량에서도 색 변화가 보이게 한다.
+      triggerGasDensityPulse(-amt*2.4, 2400, .38);
+    }
 
     if(state.vessel==='cylinder'){
       // 실제 피스톤 높이는 effectiveVolume()에서 전체 기체 몰수로 계산한다.
       // 여기서는 기체를 넣는 순간 살짝 보조 애니메이션을 줘서 움직임이 더 자연스럽게 보이도록 한다.
       let delta=0;
-      if(act==='addInert') delta=amt*.18;
+      if(act==='addInert') delta=amt*.30;
       if(act==='addNO2') delta=amt*.10;
       if(act==='addN2O4') delta=amt*.08;
       if(act==='removeNO2') delta=-amt*.08;
