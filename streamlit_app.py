@@ -102,7 +102,67 @@ APP_HTML = r'''
   .small-check{display:flex;gap:7px;align-items:flex-start;font-size:13px;color:#4e5c70;margin-top:8px;line-height:1.42;}
   .danger-text{color:var(--pink);font-weight:900;}
   .eq-mark{color:#0e74d4;font-weight:950;}
-  @media (max-width:1200px){
+
+  /* 모바일 전용 탭 인터페이스: 아이폰/아이패드 세로 화면에서 조건·실험·결과를 나누어 보여준다. */
+  .mobile-tabs{display:none;gap:7px;grid-template-columns:1fr 1fr 1fr;}
+  .mobile-tab{height:38px;border-radius:14px;background:#ffffff;color:#42516a;border:1px solid #d7e6f6;box-shadow:0 8px 18px rgba(89,114,148,.10);font-size:13px;font-weight:950;}
+  .mobile-tab.active{background:#192235;color:#ffffff;border-color:#192235;}
+  @media (max-width:820px){
+    html,body{overflow:hidden;touch-action:manipulation;}
+    .app{height:860px;padding:8px;gap:8px;overflow:hidden;background:linear-gradient(160deg,#fffaf4 0%,#f2fbff 46%,#f8f7ff 100%);}
+    .topbar{grid-template-columns:1fr;gap:8px;min-height:0;}
+    .title-card{padding:10px 12px;border-radius:18px;min-height:54px;}
+    .logo{font-size:22px;}
+    h1{font-size:20px;letter-spacing:-.9px;}
+    .select-card{padding:9px 10px;border-radius:18px;display:grid;grid-template-columns:74px 1fr;align-items:center;gap:8px;}
+    .select-label{font-size:12.5px;}
+    .experiment-select{height:35px;border-radius:10px;font-size:11.7px;padding:0 8px;}
+    .mobile-tabs{display:grid;}
+    .main{display:block;flex:1;min-height:0;overflow:hidden;}
+    .main > .panel,.main > .stage-card,.main > .result-card{height:100%;min-height:0;border-radius:20px;padding:10px;display:none;overflow:hidden;}
+    .main[data-mobile-tab="control"] > .panel{display:block;}
+    .main[data-mobile-tab="stage"] > .stage-card{display:flex;}
+    .main[data-mobile-tab="result"] > .result-card{display:block;overflow:auto;}
+    .panel-scroll{height:100%;overflow:auto;padding-right:4px;}
+    .panel h2,.result-card h2{font-size:20px;margin-bottom:8px;}
+    .control-section{padding:10px;margin-bottom:8px;border-radius:15px;}
+    .equation-pill{font-size:12.5px;padding:7px 8px;}
+    label.radio{font-size:13px;}
+    .range-wrap{margin:10px 0;}
+    .range-label{font-size:12.3px;}
+    input[type=range]{height:26px;}
+    .inline-select{height:38px;font-size:13px;}
+    button{height:39px;font-size:13px;}
+    .stage-head{margin-bottom:7px;}
+    .stage-title{font-size:15.5px;}
+    .legend{gap:5px;}
+    .legend-chip{font-size:10.5px;padding:5px 7px;}
+    .stage-canvas-wrap{height:calc(100% - 45px);min-height:0;border-radius:20px;}
+    .result-grid{grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px;}
+    .metric{padding:8px;border-radius:13px;}
+    .metric .label{font-size:11.5px;}
+    .metric .value{font-size:16px;}
+    .badges{gap:6px;margin:5px 0 8px;}
+    .badge{font-size:11.5px;padding:6px 8px;}
+    .formula{font-size:11.8px;line-height:1.45;padding:8px;margin-bottom:8px;}
+    .formula code{font-size:11.5px;}
+    .mini-table{font-size:11.2px;margin-bottom:8px;}
+    .mini-table th,.mini-table td{padding:5px 5px;}
+    .chart-grid{grid-template-columns:1fr;gap:8px;}
+    .chart-card{padding:7px 8px;border-radius:14px;}
+    .chart-title{font-size:12.8px;}
+    canvas.chart{height:132px;}
+  }
+  @media (max-width:430px){
+    .app{height:850px;padding:7px;}
+    .select-card{grid-template-columns:1fr;gap:5px;}
+    .experiment-select{font-size:11px;}
+    .mobile-tab{height:36px;font-size:12.5px;}
+    .result-grid{grid-template-columns:1fr 1fr;}
+    canvas.chart{height:122px;}
+  }
+
+  @media (min-width:821px) and (max-width:1200px){
     .app{height:auto;overflow:auto}.main{grid-template-columns:1fr}.topbar{grid-template-columns:1fr}.stage-canvas-wrap{min-height:430px}.chart-grid{grid-template-columns:1fr}.subtitle{white-space:normal;}
   }
 </style>
@@ -125,7 +185,13 @@ APP_HTML = r'''
     </div>
   </div>
 
-  <div class="main">
+  <div class="mobile-tabs" aria-label="모바일 화면 전환">
+    <button type="button" class="mobile-tab" data-tab="control">조건</button>
+    <button type="button" class="mobile-tab active" data-tab="stage">실험</button>
+    <button type="button" class="mobile-tab" data-tab="result">결과</button>
+  </div>
+
+  <div class="main" id="main" data-mobile-tab="stage">
     <aside class="panel">
       <div class="panel-scroll">
         <h2>조건 변화</h2>
@@ -242,6 +308,21 @@ APP_HTML = r'''
   const ctx = stage.getContext('2d');
   const qkCtx = $('qkChart').getContext('2d');
   const rateCtx = $('rateChart').getContext('2d');
+
+
+  function setMobileTab(tab){
+    const main = $('main');
+    if(!main) return;
+    main.setAttribute('data-mobile-tab', tab);
+    document.querySelectorAll('.mobile-tab').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.tab===tab);
+    });
+    // 숨겨져 있던 캔버스는 다시 보이는 순간 크기를 다시 읽어야 선명하게 그려진다.
+    setTimeout(()=>{ drawStage(); drawCharts(); }, 60);
+  }
+  document.querySelectorAll('.mobile-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>setMobileTab(btn.dataset.tab));
+  });
 
   const state = {
     experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.5, displayVolume:2.5, inert:0.0,
@@ -865,4 +946,4 @@ APP_HTML = r'''
 </html>
 '''
 
-components.html(APP_HTML, height=870, scrolling=False)
+components.html(APP_HTML, height=900, scrolling=False)
