@@ -479,9 +479,11 @@ APP_HTML = r'''
     // H2O 첨가는 희석과 H+ 감소를 통해 오른쪽(크로메이트, 노란색) 이동이 분명히 보이도록 반영한다.
     return clamp(2.4 + state.temp/45 + (state.chromate.dilution*1.35), 1.2, 8.4);
   }
+  function chromateHFactor(){ return 1.30; }
   function chromateQ(ch=state.displayChromate){
-    // 교육용 표현: 균형 비율을 Q값으로 대응시켜 K와 만나는 지점을 선명하게 보여준다.
-    return 1.05 + ch.balance*5.7 + (ch.h-1)*0.35;
+    // 교육용 표현: HCl/NaOH로 H+가 변하면 Q가 즉시 달라지고,
+    // 이후 balance가 이동하면서 다시 K와 만나도록 맞춘다.
+    return 1.05 + ch.balance*5.7 + (ch.h-1)*chromateHFactor();
   }
   function solveChromateEquilibrium(source){
     // 다이크로메이트/크로메이트도 최종 평형 상태에서는 반드시 Q = K가 되도록 맞춘다.
@@ -490,7 +492,7 @@ APP_HTML = r'''
     // 여기서는 chromateQ(balance, h) = chromateK()가 되도록 balance를 역산한다.
     const K = chromateK();
     const h = source.h;
-    const balance = clamp((K - 1.05 - (h-1)*0.35) / 5.7, 0.08, 0.94);
+    const balance = clamp((K - 1.05 - (h-1)*chromateHFactor()) / 5.7, 0.08, 0.94);
     return {balance, h};
   }
 
@@ -981,9 +983,16 @@ APP_HTML = r'''
   $('resetGas').addEventListener('click',resetGas);
   $('applyChromate').addEventListener('click',()=>{
     const amt=Number($('chromateAmount').value); const act=$('chromateAction').value;
-    if(act==='hcl') state.chromate.h=clamp(state.chromate.h + amt*1.25,.15,2.8);
-    if(act==='naoh') state.chromate.h=clamp(state.chromate.h - amt*1.35,.15,2.8);
-    if(act==='water'){ state.chromate.h=clamp(state.chromate.h - amt*.60,.15,2.8); state.chromate.dilution=clamp(state.chromate.dilution+amt*.70,0,1.6); }
+    // 시약을 넣는 순간에는 색 비율은 아직 그대로이고 H+만 먼저 바뀐 상태가 된다.
+    // 이 '교란 직후' 상태를 출발점으로 삼아야 HCl/NaOH에서도 Q와 K가 어긋난 뒤
+    // 다시 평형으로 이동하는 과정이 제대로 보인다.
+    const current = {...state.displayChromate};
+    state.chromate.balance = current.balance;
+    state.chromate.h = current.h;
+    if(act==='hcl') state.chromate.h=clamp(state.chromate.h + amt*1.25,.15,2.4);
+    if(act==='naoh') state.chromate.h=clamp(state.chromate.h - amt*1.35,.15,2.4);
+    if(act==='water'){ state.chromate.h=clamp(state.chromate.h - amt*.60,.15,2.4); state.chromate.dilution=clamp(state.chromate.dilution+amt*.70,0,1.6); }
+    state.displayChromate = {...current, h:state.chromate.h};
     startTransition(solveChromateEquilibrium(state.chromate));
   });
   $('resetChromate').addEventListener('click',resetChromate);
