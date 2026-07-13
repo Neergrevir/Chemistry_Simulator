@@ -277,16 +277,26 @@ APP_HTML = r'''
     return {w:r.width,h:r.height};
   }
 
-  function effectiveVolume(){
+  const INITIAL_GAS_TOTAL = 3.00;
+  const BASE_TEMP_K = 273 + 43;
+  function activeGasTotal(g=state.displayGas){
+    return Math.max(0.05, g.no2 + g.n2o4 + state.inert);
+  }
+  function effectiveVolume(g=state.displayGas, rawVolume=state.volume){
     if(state.experiment==='chromate') return 3.40;
-    if(state.vessel==='steel') return state.volume;
-    return clamp(state.volume / Math.sqrt(state.pressure), .85, 4.30);
+    if(state.vessel==='steel') return rawVolume;
+    // 일정 외부 압력 피스톤에서는 V ∝ nT/P가 되도록 교육용으로 과장 반영한다.
+    // 그래서 기체 몰수가 많아질수록 피스톤이 눈에 띄게 위로 올라간다.
+    const molFactor = activeGasTotal(g) / INITIAL_GAS_TOTAL;
+    const tempFactor = (273 + state.temp) / BASE_TEMP_K;
+    const pressureFactor = Math.max(0.25, state.pressure);
+    return clamp(rawVolume * molFactor * tempFactor / pressureFactor, .85, 4.30);
   }
   function visualEffectiveVolume(){
     const v = state.displayVolume ?? state.volume;
     if(state.experiment==='chromate') return 3.40;
     if(state.vessel==='steel') return v;
-    return clamp(v / Math.sqrt(state.pressure), .85, 4.30);
+    return effectiveVolume(state.displayGas, v);
   }
   function setVolumeAnimated(newVolume, duration=900){
     const from = state.displayVolume ?? state.volume;
@@ -310,13 +320,13 @@ APP_HTML = r'''
     // 2NO2 -> N2O4는 발열 반응이므로 온도가 높을수록 K가 작아지도록 설정한다.
     return clamp(4.4 * Math.exp((40-temp)/34), 0.18, 18.0);
   }
-  function gasQ(g=state.displayGas, vol=effectiveVolume()){
+  function gasQ(g=state.displayGas, vol=effectiveVolume(g)){
     const cNO2 = Math.max(g.no2/vol, 1e-6);
     const cN2O4 = Math.max(g.n2o4/vol, 1e-6);
     return cN2O4/(cNO2*cNO2);
   }
   function solveGasEquilibrium(sourceGas){
-    const V = effectiveVolume();
+    const V = effectiveVolume(sourceGas);
     const K = gasK();
     const total = Math.max(sourceGas.no2 + 2*sourceGas.n2o4, .08);
     let lo=0, hi=total/2-1e-5;
@@ -372,11 +382,11 @@ APP_HTML = r'''
   }
 
   function rateForwardGas(g=state.displayGas){
-    const c = Math.max(g.no2/effectiveVolume(),0.001);
+    const c = Math.max(g.no2/effectiveVolume(g),0.001);
     return clamp(0.11 + c*c*0.72 + state.temp/850, .03, 2.2);
   }
   function rateReverseGas(g=state.displayGas){
-    const c = Math.max(g.n2o4/effectiveVolume(),0.001);
+    const c = Math.max(g.n2o4/effectiveVolume(g),0.001);
     return clamp(0.08 + c*0.32 + state.temp/1100, .03, 2.2);
   }
   function rateForwardChromate(ch=state.displayChromate){ return clamp(0.25 + (1-ch.balance)*0.65 + state.temp/580, .08, 1.4); }
@@ -707,7 +717,7 @@ APP_HTML = r'''
       $('stageTitle').textContent='2NO₂(g) ⇌ N₂O₄(g)';
       $('containerNote').textContent='';
       $('legend').innerHTML='<span class="legend-chip"><span class="legend-dot" style="background:#d97836"></span>NO₂ 적갈색</span><span class="legend-chip"><span class="legend-dot" style="background:#eef5ff;border:1px solid #7d8ea1"></span>N₂O₄ 무색</span>' + (state.inert>0.01 ? '<span class="legend-chip"><span class="legend-dot" style="background:#d8efff;border:1px solid #5791be"></span>H₂ 비활성</span>' : '');
-      const K=gasK(), Q=gasQ(), dir=directionFrom(Q,K), V=effectiveVolume();
+      const K=gasK(), Q=gasQ(), dir=directionFrom(Q,K), V=effectiveVolume(state.displayGas);
       $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent=fmt(V,2)+' L';
       const no2Frac=state.displayGas.no2/(state.displayGas.no2+state.displayGas.n2o4+1e-6);
       $('badges').innerHTML=`<span class="badge">${dir==='정반응'?'N₂O₄ 생성 증가':dir==='역반응'?'NO₂ 생성 증가':'K = Q 평형'}</span><span class="badge">NO₂ 비율 ${(no2Frac*100).toFixed(0)}%</span>${state.inert>0.01?`<span class="badge">H₂ ${fmt(state.inert,2)} mol</span>`:''}`;
@@ -776,13 +786,15 @@ APP_HTML = r'''
     if(act==='addInert') state.inert=clamp(state.inert+amt,0,4.0);
 
     if(state.vessel==='cylinder'){
+      // 실제 피스톤 높이는 effectiveVolume()에서 전체 기체 몰수로 계산한다.
+      // 여기서는 기체를 넣는 순간 살짝 보조 애니메이션을 줘서 움직임이 더 자연스럽게 보이도록 한다.
       let delta=0;
-      if(act==='addNO2') delta=amt*.46;
-      if(act==='addN2O4') delta=amt*.34;
-      if(act==='addInert') delta=amt*.70;
-      if(act==='removeNO2') delta=-amt*.34;
-      if(act==='removeN2O4') delta=-amt*.25;
-      if(delta!==0) setVolumeAnimated(beforeVol+delta);
+      if(act==='addInert') delta=amt*.18;
+      if(act==='addNO2') delta=amt*.10;
+      if(act==='addN2O4') delta=amt*.08;
+      if(act==='removeNO2') delta=-amt*.08;
+      if(act==='removeN2O4') delta=-amt*.06;
+      if(delta!==0) setVolumeAnimated(beforeVol+delta, 900);
     }
     state.gas={...src};state.displayGas={...src};
     startTransition(solveGasEquilibrium(src));
