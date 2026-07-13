@@ -479,8 +479,7 @@ APP_HTML = r'''
       ctx.strokeStyle='#9eabb9';ctx.lineWidth=12;ctx.lineCap='round';
       ctx.beginPath();ctx.moveTo(pg.x+pg.w/2,pg.pistonY-82);ctx.lineTo(pg.x+pg.w/2,pg.pistonY-12);ctx.stroke();
       drawRoundedRect(ctx,pg.x+28,pg.pistonY,pg.w-56,26,11,'#b9c4cf','#8190a0',3);
-      ctx.fillStyle='rgba(255,255,255,.72)';ctx.font='800 13px Segoe UI, sans-serif';ctx.textAlign='center';
-      ctx.fillText('압력 조절 피스톤',pg.x+pg.w/2,pg.pistonY-31);
+      // 피스톤 위 안내 문구는 작은 화면에서 글자가 잘려 보이므로 표시하지 않는다.
     } else {
       drawRoundedRect(ctx,pg.x+10,pg.y+8,pg.w-20,pg.h-18,36,'rgba(255,255,255,.34)','#778392',10);
       drawRoundedRect(ctx,pg.x+25,pg.y+28,pg.w-50,pg.h-58,24,vesselColor,null,0);
