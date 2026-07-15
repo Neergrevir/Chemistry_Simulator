@@ -399,7 +399,7 @@ APP_HTML = r'''
   });
 
   const state = {
-    experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0, displayInert:0.0, inertAnim:null,
+    experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0, displayInert:0.0, inertAnim:null, hePistonAnim:null,
     gas:{no2:0.80, n2o4:2.20},
     chromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.05, solutionVolume:1.00},
     displayGas:{no2:0.80, n2o4:2.20},
@@ -457,6 +457,16 @@ APP_HTML = r'''
     const v = state.displayVolume ?? state.volume;
     if(state.experiment==='chromate') return 3.40;
     if(state.vessel==='steel') return v;
+
+    // He 첨가 직후의 1차 팽창과, 이후 역반응으로 인한 2차 팽창을 분리해서 보여준다.
+    // 계산에 쓰이는 실제 부피는 effectiveVolume()을 그대로 사용하고,
+    // 피스톤 그림에만 즉시 팽창 부피 → 최종 평형 부피 보간값을 사용한다.
+    if(state.hePistonAnim){
+      const t=clamp((performance.now()-state.hePistonAnim.start)/state.hePistonAnim.duration,0,1);
+      const shown=lerp(state.hePistonAnim.from,state.hePistonAnim.to,ease(t));
+      if(t>=1) state.hePistonAnim=null;
+      return shown;
+    }
     return effectiveVolume(state.displayGas, v, state.displayInert ?? state.inert);
   }
   function setVolumeAnimated(newVolume, duration=900){
@@ -584,7 +594,7 @@ APP_HTML = r'''
     if(state.experiment==='gas'){
       const start = {...state.displayGas};
       state.targetGas = {...target};
-      state.anim = {type:'gas', start, target:{...target}, startT:now, duration};
+      state.anim = {type:'gas', reason, start, target:{...target}, startT:now, duration};
       const q0 = gasQ(start), k1 = gasK(), q1 = gasQ(target,null,state.inert), rf0 = rateForwardGas(start), rr0 = rateReverseGas(start);
       const rf1 = rateForwardGas(target,state.inert), rr1 = rateReverseGas(target,state.inert);
       state.chart = {qStart:q0, qEnd:q1, kStart:k1, kEnd:k1, rfStart:rf0, rfEnd:(rf1+rr1)/2, rrStart:rr0, rrEnd:(rf1+rr1)/2, start:now, duration};
@@ -1117,7 +1127,7 @@ APP_HTML = r'''
     state.volume=clamp(Math.round(nextVolume),1,4);
     state.displayVolume=state.volume;
     state.pressure=1.00;
-    state.inert=0; state.displayInert=0; state.inertAnim=null;
+    state.inert=0; state.displayInert=0; state.inertAnim=null; state.hePistonAnim=null;
     state.volumeAnim=null;
     state.volumePulse=null;
     state.anim=null;
@@ -1211,6 +1221,7 @@ APP_HTML = r'''
   $('applyGas').addEventListener('click',()=>{
     const amt=Number($('gasAmount').value); const act=$('gasAction').value;
     let src={...state.displayGas};
+    state.hePistonAnim=null;
     if(act==='addNO2') src.no2+=amt;
     if(act==='removeNO2') src.no2=Math.max(.04,src.no2-amt);
     if(act==='addN2O4') src.n2o4+=amt;
@@ -1236,9 +1247,24 @@ APP_HTML = r'''
       state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:forward,rfEnd:forward,rrStart:reverse,rrEnd:reverse,start:performance.now(),duration:5000};
       updateUI();
     } else {
-      // 실린더의 He 첨가: He 양과 부피는 즉시 증가시킨다.
-      // 그 직후의 옅어진 상태를 시작점으로 삼아 역반응 평형 이동만 5초 동안 보여준다.
-      startTransition(solveGasEquilibrium(src), act==='addInert'?'helium-expansion':'condition');
+      if(act==='addInert' && state.vessel==='cylinder'){
+        // 1단계: He 전량 첨가 직후의 부피는 즉시 반영한다.
+        const immediateVolume=effectiveVolume(src,state.volume,state.inert);
+
+        // 2단계: 그 상태에서 새 평형을 계산한다. 역반응으로 총 기체 몰수가 증가하므로
+        // 최종 부피가 더 커지고, 피스톤은 5초 동안 그 위치까지 계속 상승한다.
+        const target=solveGasEquilibrium(src);
+        const finalVolume=effectiveVolume(target,state.volume,state.inert);
+        state.hePistonAnim={
+          from:immediateVolume,
+          to:finalVolume,
+          start:performance.now(),
+          duration:5000
+        };
+        startTransition(target,'helium-expansion');
+      } else {
+        startTransition(solveGasEquilibrium(src),'condition');
+      }
     }  });
   $('resetGas').addEventListener('click',resetGas);
   $('applyChromate').addEventListener('click',()=>{
