@@ -399,7 +399,7 @@ APP_HTML = r'''
   });
 
   const state = {
-    experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0, displayInert:0.0, inertAnim:null, hePistonAnim:null,
+    experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0, displayInert:0.0, inertAnim:null, hePistonAnim:null, pistonVisualVolume:null,
     gas:{no2:0.80, n2o4:2.20},
     chromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.05, solutionVolume:1.00},
     displayGas:{no2:0.80, n2o4:2.20},
@@ -438,6 +438,8 @@ APP_HTML = r'''
 
   const INITIAL_GAS_TOTAL = 3.00;
   const BASE_TEMP_K = 273 + 43;
+  const PISTON_VISUAL_GAIN_HE = 2.4;
+  const PISTON_VISUAL_GAIN_EQUILIBRIUM = 2.8;
   function activeGasTotal(g=state.displayGas, inertAmount=(state.displayInert ?? state.inert)){
     return Math.max(0.05, g.no2 + g.n2o4 + inertAmount);
   }
@@ -464,9 +466,13 @@ APP_HTML = r'''
     if(state.hePistonAnim){
       const t=clamp((performance.now()-state.hePistonAnim.start)/state.hePistonAnim.duration,0,1);
       const shown=lerp(state.hePistonAnim.from,state.hePistonAnim.to,ease(t));
-      if(t>=1) state.hePistonAnim=null;
+      if(t>=1){
+        state.pistonVisualVolume=state.hePistonAnim.to;
+        state.hePistonAnim=null;
+      }
       return shown;
     }
+    if(Number.isFinite(state.pistonVisualVolume)) return state.pistonVisualVolume;
     return effectiveVolume(state.displayGas, v, state.displayInert ?? state.inert);
   }
   function setVolumeAnimated(newVolume, duration=900){
@@ -610,6 +616,7 @@ APP_HTML = r'''
   }
 
   function applyConditionChange(){
+    if(state.experiment==='gas' && !state.hePistonAnim) state.pistonVisualVolume=null;
     if(state.experiment==='gas') startTransition(solveGasEquilibrium(state.displayGas));
     else startTransition(solveChromateEquilibrium(state.chromate));
   }
@@ -1127,7 +1134,7 @@ APP_HTML = r'''
     state.volume=clamp(Math.round(nextVolume),1,4);
     state.displayVolume=state.volume;
     state.pressure=1.00;
-    state.inert=0; state.displayInert=0; state.inertAnim=null; state.hePistonAnim=null;
+    state.inert=0; state.displayInert=0; state.inertAnim=null; state.hePistonAnim=null; state.pistonVisualVolume=null;
     state.volumeAnim=null;
     state.volumePulse=null;
     state.anim=null;
@@ -1222,6 +1229,7 @@ APP_HTML = r'''
     const amt=Number($('gasAmount').value); const act=$('gasAction').value;
     let src={...state.displayGas};
     state.hePistonAnim=null;
+    if(act!=='addInert') state.pistonVisualVolume=null;
     if(act==='addNO2') src.no2+=amt;
     if(act==='removeNO2') src.no2=Math.max(.04,src.no2-amt);
     if(act==='addN2O4') src.n2o4+=amt;
@@ -1249,15 +1257,27 @@ APP_HTML = r'''
     } else {
       if(act==='addInert' && state.vessel==='cylinder'){
         // 1단계: He 전량 첨가 직후의 부피는 즉시 반영한다.
+        const beforeHeVolume=effectiveVolume(src,state.volume,state.inert-amt);
         const immediateVolume=effectiveVolume(src,state.volume,state.inert);
 
-        // 2단계: 그 상태에서 새 평형을 계산한다. 역반응으로 총 기체 몰수가 증가하므로
-        // 최종 부피가 더 커지고, 피스톤은 5초 동안 그 위치까지 계속 상승한다.
+        // 실제 계산값은 그대로 두되, 피스톤 그림만 교육적으로 더 크게 움직인다.
+        // 1차: He 첨가에 따른 즉시 팽창을 약 2.4배 강조한다.
+        const visualImmediate=clamp(
+          beforeHeVolume + (immediateVolume-beforeHeVolume)*PISTON_VISUAL_GAIN_HE,
+          .55, 4.60
+        );
+
+        // 2차: 역반응으로 총 기체 몰수가 늘어나는 추가 팽창을 약 2.8배 강조한다.
         const target=solveGasEquilibrium(src);
         const finalVolume=effectiveVolume(target,state.volume,state.inert);
+        const visualFinal=clamp(
+          visualImmediate + (finalVolume-immediateVolume)*PISTON_VISUAL_GAIN_EQUILIBRIUM,
+          .55, 4.60
+        );
+        state.pistonVisualVolume=visualImmediate;
         state.hePistonAnim={
-          from:immediateVolume,
-          to:finalVolume,
+          from:visualImmediate,
+          to:visualFinal,
           start:performance.now(),
           duration:5000
         };
