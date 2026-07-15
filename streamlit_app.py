@@ -399,7 +399,7 @@ APP_HTML = r'''
   });
 
   const state = {
-    experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0,
+    experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0, displayInert:0.0, inertAnim:null,
     gas:{no2:0.80, n2o4:2.20},
     chromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.05, solutionVolume:1.00},
     displayGas:{no2:0.80, n2o4:2.20},
@@ -409,8 +409,6 @@ APP_HTML = r'''
     anim:null,
     volumeAnim:null,
     volumePulse:null,
-    pendingGasTransition:null,
-    hePistonEmphasis:null,
     steelResetUntil:0,
     referenceGasTotal:3.00,
     referenceTempK:273 + 43,
@@ -440,17 +438,17 @@ APP_HTML = r'''
 
   const INITIAL_GAS_TOTAL = 3.00;
   const BASE_TEMP_K = 273 + 43;
-  function activeGasTotal(g=state.displayGas){
-    return Math.max(0.05, g.no2 + g.n2o4 + state.inert);
+  function activeGasTotal(g=state.displayGas, inertAmount=(state.displayInert ?? state.inert)){
+    return Math.max(0.05, g.no2 + g.n2o4 + inertAmount);
   }
-  function effectiveVolume(g=state.displayGas, rawVolume=state.volume){
+  function effectiveVolume(g=state.displayGas, rawVolume=state.volume, inertAmount=(state.displayInert ?? state.inert)){
     if(state.experiment==='chromate') return 3.40;
     if(state.vessel==='steel') return rawVolume;
-    // 새 실험을 시작할 때의 기체량을 기준값으로 저장한다.
-    // 따라서 선택한 1·2·3·4 L 용기에서는 처음에 정확히 그 부피와 1 atm 상태로 시작하고,
-    // 이후 압력·온도·기체량 변화에 대해서만 피스톤이 움직인다.
+    // 일정 외부 압력의 실린더에서는 V ∝ nT/P이다.
+    // He는 반응식에는 들어가지 않지만 전체 기체 몰수에는 포함되므로,
+    // 첨가량만큼 부피가 자연스럽게 증가한다.
     const reference = Math.max(0.05, state.referenceGasTotal || INITIAL_GAS_TOTAL);
-    const molFactor = activeGasTotal(g) / reference;
+    const molFactor = activeGasTotal(g, inertAmount) / reference;
     const tempFactor = (273 + state.temp) / Math.max(1,state.referenceTempK || BASE_TEMP_K);
     const pressureFactor = Math.max(0.25, state.pressure);
     return clamp(rawVolume * molFactor * tempFactor / pressureFactor, .55, 4.60);
@@ -459,16 +457,7 @@ APP_HTML = r'''
     const v = state.displayVolume ?? state.volume;
     if(state.experiment==='chromate') return 3.40;
     if(state.vessel==='steel') return v;
-    let actual = effectiveVolume(state.displayGas, v);
-    // He 첨가 뒤 역반응으로 총 기체 몰수가 늘어나는 동안 피스톤 이동이
-    // 작은 화면에서도 보이도록 중간 구간에만 완만한 시각 강조를 더한다.
-    // 최종 시점에는 강조값이 0이 되어 실제 계산 부피와 정확히 일치한다.
-    if(state.hePistonEmphasis){
-      const t=clamp((performance.now()-state.hePistonEmphasis.start)/state.hePistonEmphasis.duration,0,1);
-      actual += state.hePistonEmphasis.extra * Math.sin(Math.PI*t);
-      if(t>=1) state.hePistonEmphasis=null;
-    }
-    return actual;
+    return effectiveVolume(state.displayGas, v, state.displayInert ?? state.inert);
   }
   function setVolumeAnimated(newVolume, duration=900){
     const from = state.displayVolume ?? state.volume;
@@ -498,7 +487,8 @@ APP_HTML = r'''
     // 2NO2 -> N2O4는 발열 반응이므로 온도가 높을수록 K가 작아지도록 설정한다.
     return clamp(4.4 * Math.exp((40-temp)/34), 0.18, 18.0);
   }
-  function gasQ(g=state.displayGas, vol=effectiveVolume(g)){
+  function gasQ(g=state.displayGas, vol=null, inertAmount=(state.displayInert ?? state.inert)){
+    if(vol===null) vol=effectiveVolume(g,state.volume,inertAmount);
     const cNO2 = Math.max(g.no2/vol, 1e-6);
     const cN2O4 = Math.max(g.n2o4/vol, 1e-6);
     return cN2O4/(cNO2*cNO2);
@@ -527,7 +517,7 @@ APP_HTML = r'''
       // 피스톤 용기에서는 부피가 최종 평형 조성의 전체 몰수에 따라 달라진다.
       // 따라서 sourceGas의 부피를 고정해서 풀면 최종 표시 Q가 K와 달라질 수 있다.
       const trialGas = {no2:a, n2o4:b};
-      const V = effectiveVolume(trialGas, state.volume);
+      const V = effectiveVolume(trialGas, state.volume, state.inert);
       const val = b*V/(a*a);
       if(val < K) lo=b; else hi=b;
     }
@@ -595,8 +585,8 @@ APP_HTML = r'''
       const start = {...state.displayGas};
       state.targetGas = {...target};
       state.anim = {type:'gas', start, target:{...target}, startT:now, duration};
-      const q0 = gasQ(start), k1 = gasK(), q1 = gasQ(target), rf0 = rateForwardGas(start), rr0 = rateReverseGas(start);
-      const rf1 = rateForwardGas(target), rr1 = rateReverseGas(target);
+      const q0 = gasQ(start), k1 = gasK(), q1 = gasQ(target,null,state.inert), rf0 = rateForwardGas(start), rr0 = rateReverseGas(start);
+      const rf1 = rateForwardGas(target,state.inert), rr1 = rateReverseGas(target,state.inert);
       state.chart = {qStart:q0, qEnd:q1, kStart:k1, kEnd:k1, rfStart:rf0, rfEnd:(rf1+rr1)/2, rrStart:rr0, rrEnd:(rf1+rr1)/2, start:now, duration};
       animatePistonByEquilibrium(start,target);
     } else {
@@ -614,12 +604,12 @@ APP_HTML = r'''
     else startTransition(solveChromateEquilibrium(state.chromate));
   }
 
-  function rateForwardGas(g=state.displayGas){
-    const c = Math.max(g.no2/effectiveVolume(g),0.001);
+  function rateForwardGas(g=state.displayGas, inertAmount=(state.displayInert ?? state.inert)){
+    const c = Math.max(g.no2/effectiveVolume(g,state.volume,inertAmount),0.001);
     return clamp(0.11 + c*c*0.72 + state.temp/850, .03, 2.2);
   }
-  function rateReverseGas(g=state.displayGas){
-    const c = Math.max(g.n2o4/effectiveVolume(g),0.001);
+  function rateReverseGas(g=state.displayGas, inertAmount=(state.displayInert ?? state.inert)){
+    const c = Math.max(g.n2o4/effectiveVolume(g,state.volume,inertAmount),0.001);
     return clamp(0.08 + c*0.32 + state.temp/1100, .03, 2.2);
   }
   function rateForwardChromate(ch=state.displayChromate){ return clamp(0.25 + (1-ch.balance)*0.65 + state.temp/580, .08, 1.4); }
@@ -762,7 +752,7 @@ APP_HTML = r'''
     const amountScale = clamp((activeGasTotal(state.displayGas)/Math.max(state.referenceGasTotal,0.05))*(state.volume/2), .28, 2.25);
     const no2Need = Math.round(clamp((10 + no2Frac*32)*amountScale, 3, 72));
     const n2o4Need = Math.round(clamp((8 + (1-no2Frac)*22)*amountScale, 2, 55));
-    const heNeed = Math.round(clamp(state.inert*14*amountScale, 0, 42));
+    const heNeed = Math.round(clamp((state.displayInert ?? state.inert)*14*amountScale, 0, 42));
     let desired = no2Need + n2o4Need + heNeed;
     while(state.molecules.length<desired){
       state.molecules.push({kind:'no2',x:pg.x+45+Math.random()*(pg.w-90),y:pg.gasTop+25+Math.random()*(pg.gasBottom-pg.gasTop-50),vx:Math.random()*2-1,vy:Math.random()*2-1,r:7+Math.random()*2});
@@ -991,13 +981,14 @@ APP_HTML = r'''
   }
 
   function updateAnim(){
-    // He를 넣은 직후의 팽창 상태를 잠시 보여 준 다음 평형 이동을 시작한다.
-    // 이렇게 하면 '첨가 직후 부피'와 '새 평형 부피'의 두 단계가 분명히 관찰된다.
-    if(state.pendingGasTransition && performance.now()>=state.pendingGasTransition.startAt){
-      const pending=state.pendingGasTransition;
-      state.pendingGasTransition=null;
-      startTransition(pending.target,'helium-equilibrium');
-      state.hePistonEmphasis={start:performance.now(),duration:5000,extra:pending.extra};
+    // He 첨가는 별도의 대기 단계 없이 부피 증가와 평형 이동이 동시에 시작된다.
+    // displayInert를 짧게 보간하여 피스톤 팽창과 순간적인 색 희석이 자연스럽게 보이게 한다.
+    if(state.inertAnim){
+      const it=clamp((performance.now()-state.inertAnim.start)/state.inertAnim.duration,0,1);
+      state.displayInert=lerp(state.inertAnim.from,state.inertAnim.to,ease(it));
+      if(it>=1){state.displayInert=state.inertAnim.to;state.inertAnim=null;}
+    } else {
+      state.displayInert=state.inert;
     }
     if(state.volumeAnim){
       const vt = clamp((performance.now()-state.volumeAnim.start)/state.volumeAnim.duration,0,1);
@@ -1132,7 +1123,7 @@ APP_HTML = r'''
     state.volume=clamp(Math.round(nextVolume),1,4);
     state.displayVolume=state.volume;
     state.pressure=1.00;
-    state.inert=0;
+    state.inert=0; state.displayInert=0; state.inertAnim=null;
     state.volumeAnim=null;
     state.volumePulse=null;
     state.anim=null;
@@ -1230,62 +1221,37 @@ APP_HTML = r'''
     if(act==='removeNO2') src.no2=Math.max(.04,src.no2-amt);
     if(act==='addN2O4') src.n2o4+=amt;
     if(act==='removeN2O4') src.n2o4=Math.max(.04,src.n2o4-amt);
+    let previousInert=state.displayInert ?? state.inert;
     if(act==='addInert'){
       state.inert=clamp(state.inert+amt,0,4.0);
-      if(state.vessel==='cylinder'){
-        // 일정 외부 압력의 피스톤 실린더에서는 He가 부피를 늘려
-        // NO₂와 N₂O₄의 농도를 낮춘다. 따라서 순간적으로 옅어지고,
-        // 이후 역반응으로 NO₂가 늘며 다시 진해지는 과정을 표현한다.
-        triggerGasDensityPulse(-amt*1.35, 1900, .20);
+      if(state.vessel==='steel'){
+        // 정적 강철용기: 부피가 일정하므로 반응 기체의 농도와 Q는 변하지 않는다.
+        state.displayInert=state.inert;
+        state.inertAnim=null;
+        state.volumePulse=null;
       } else {
-        // 정적 강철용기는 부피가 일정하다. 비활성 기체를 넣어도
-        // NO₂와 N₂O₄의 몰수·몰농도·부분압력은 변하지 않으므로 Q와 평형 조성,
-        // 그리고 기체 색은 변하지 않아야 한다.
+        // 피스톤 실린더: He 증가량을 전체 기체 몰수 증가로 반영한다.
+        // 별도 시간 지연 없이 부피 팽창과 평형 이동을 동시에 시작한다.
+        state.inertAnim={from:previousInert,to:state.inert,start:performance.now(),duration:900};
         state.volumePulse=null;
       }
     }
 
-    if(state.vessel==='cylinder'){
-      // 선택한 기준 부피(1~4 L)는 유지한다. 기체 첨가·제거에 따른 피스톤 위치는
-      // effectiveVolume()이 기체 몰수와 압력으로 계산하므로 별도의 부피 슬라이더 값은 바꾸지 않는다.
-    }
     state.gas={...src};state.displayGas={...src};
     if(act==='addInert' && state.vessel==='steel'){
-      // 강철용기에서의 비활성 기체 첨가는 반응 성분의 상태를 교란하지 않는다.
-      // 불필요한 평형 전환 애니메이션도 시작하지 않고 현재 K=Q 상태를 유지한다.
-      const q=gasQ(state.displayGas, state.volume);
+      const q=gasQ(state.displayGas,state.volume,state.inert);
       const k=gasK();
-      const forward=rateForwardGas(state.displayGas);
-      const reverse=rateReverseGas(state.displayGas);
+      const forward=rateForwardGas(state.displayGas,state.inert);
+      const reverse=rateReverseGas(state.displayGas,state.inert);
       state.targetGas={...state.displayGas};
       state.anim=null;
-      state.pendingGasTransition=null;
-      state.hePistonEmphasis=null;
       state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:forward,rfEnd:forward,rrStart:reverse,rrEnd:reverse,start:performance.now(),duration:5000};
       updateUI();
-    } else if(act==='addInert' && state.vessel==='cylinder'){
-      // 1단계: He 첨가 직후, 외부 압력 일정 조건에서 피스톤이 먼저 올라간 상태를 보여 준다.
-      // 2단계: 약 0.65초 뒤 역반응(N₂O₄ → 2NO₂)이 시작되고 총 기체 몰수가 더 증가하면서
-      // 피스톤이 새 평형 위치까지 한 번 더 올라가도록 한다.
-      const target=solveGasEquilibrium(src);
-      const immediateV=effectiveVolume(src,state.volume);
-      const finalV=effectiveVolume(target,state.volume);
-      const actualDelta=Math.max(0,finalV-immediateV);
-      // 실제 최종 부피는 계산값을 그대로 사용하고, 이동 중에만 최대 0.16 L의 시각 강조를 준다.
-      const extra=clamp(0.10 + actualDelta*0.9,0.10,0.16);
-      state.targetGas={...target};
-      state.anim=null;
-      state.pendingGasTransition={target,startAt:performance.now()+650,extra};
-      const q=gasQ(src),k=gasK();
-      const rf=rateForwardGas(src),rr=rateReverseGas(src);
-      state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:rf,rfEnd:rf,rrStart:rr,rrEnd:rr,start:performance.now(),duration:650};
-      updateUI();
     } else {
-      state.pendingGasTransition=null;
-      state.hePistonEmphasis=null;
-      startTransition(solveGasEquilibrium(src));
-    }
-  });
+      // 실린더의 He 첨가: 최종 He 양에서의 평형 조성을 계산하고 즉시 전환을 시작한다.
+      // 처음에는 He에 의한 팽창으로 색이 옅어지고, 이어 역반응으로 NO₂가 늘며 조금 진해진다.
+      startTransition(solveGasEquilibrium(src), act==='addInert'?'helium-expansion':'condition');
+    }  });
   $('resetGas').addEventListener('click',resetGas);
   $('applyChromate').addEventListener('click',()=>{
     const waterAmount=Number($('chromateAmount').value);
