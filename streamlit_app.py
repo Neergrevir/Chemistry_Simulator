@@ -391,6 +391,7 @@ APP_HTML = r'''
     anim:null,
     volumeAnim:null,
     volumePulse:null,
+    steelResetUntil:0,
     molecules:[],
     staticDots:[],
     lastTime:performance.now(),
@@ -712,7 +713,10 @@ APP_HTML = r'''
   function drawChromateStage(W,H){
     const centerX = W*.45, topY = H*.15, beakerW=Math.min(390,W*.58), beakerH=Math.min(365,H*.70);
     const b=state.displayChromate.balance;
-    const r = Math.round(235*(1-b)+246*b), gg=Math.round(104*(1-b)+218*b), bb=Math.round(34*(1-b)+70*b);
+    // 노란색 영역이 탁하게 묻히지 않도록 크로메이트 비율을 시각적으로 약간 강조한다.
+    // 계산에 쓰이는 balance, K, Q는 그대로이며 캔버스 색 혼합에만 적용된다.
+    const visualB=clamp(Math.pow(b,0.84),0,1);
+    const r = Math.round(235*(1-visualB)+250*visualB), gg=Math.round(104*(1-visualB)+226*visualB), bb=Math.round(34*(1-visualB)+62*visualB);
 
     ctx.save();
     drawRoundedRect(ctx, centerX-beakerW/2-18, topY-18, beakerW+36, beakerH+46,26,'rgba(255,255,255,.45)','#dbe7f1',1.5);
@@ -935,7 +939,13 @@ APP_HTML = r'''
         ['NO₂', state.displayGas.no2, eq.no2, state.displayGas.no2/V], ['N₂O₄', state.displayGas.n2o4, eq.n2o4, state.displayGas.n2o4/V]
       ];
       $('tableBody').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],3)} mol</td><td>${fmt(r[2],3)} mol</td><td>${fmt(r[3],3)} M</td></tr>`).join('') + (state.inert>0.01 ? `<tr><td>He</td><td>${fmt(state.inert,3)} mol</td><td>${fmt(state.inert,3)} mol</td><td>비활성</td></tr>` : '');
-      $('caption').innerHTML='<span class="caption-pill">피스톤 위치가 조건 변화에 따라 이동합니다.</span>';
+      if(state.vessel==='steel' && performance.now()<state.steelResetUntil){
+        $('caption').innerHTML='<span class="caption-pill">새 부피의 강철용기로 새 실험을 시작했습니다. (Q = K)</span>';
+      } else if(state.vessel==='cylinder'){
+        $('caption').innerHTML='<span class="caption-pill">피스톤 위치가 조건 변화에 따라 이동합니다.</span>';
+      } else {
+        $('caption').innerHTML='';
+      }
     } else {
       $('leftEquation').textContent='Cr₂O₇²⁻ + H₂O ⇌ 2CrO₄²⁻ + 2H⁺';
       $('stageTitle').textContent='Cr₂O₇²⁻(aq) + H₂O(l) ⇌ 2CrO₄²⁻(aq) + 2H⁺(aq)';
@@ -961,7 +971,7 @@ APP_HTML = r'''
 
   function resetGas(){
     state.temp=43;state.pressure=1;state.volume=2.5;state.displayVolume=2.5;state.inert=0;state.vessel='cylinder';
-    state.gas={no2:.80,n2o4:2.20};state.displayGas={...state.gas};
+    state.gas={no2:.80,n2o4:2.20};state.displayGas={...state.gas};state.steelResetUntil=0;
     document.querySelector('input[name="vessel"][value="cylinder"]').checked=true;
     $('temp').value=state.temp;$('pressure').value=state.pressure;$('volume').value=state.volume;
     startTransition(solveGasEquilibrium(state.gas));
@@ -970,6 +980,36 @@ APP_HTML = r'''
     state.temp=43;state.chromate={balance:.58,h:1.0,dilution:0};state.displayChromate={balance:.58,h:1.0,dilution:0};
     $('temp').value=state.temp;
     startTransition(solveChromateEquilibrium(state.chromate));
+  }
+
+  function startNewSteelExperiment(nextVolume){
+    // 강철용기는 실험 도중 부피를 바꿀 수 없으므로, 부피 슬라이더 변경을
+    // 기존 평형의 교란이 아니라 '새로운 부피의 강철용기로 새 실험 시작'으로 처리한다.
+    state.volume=clamp(nextVolume,1.00,4.00);
+    state.displayVolume=state.volume;
+    state.volumeAnim=null;
+    state.volumePulse=null;
+    state.anim=null;
+    state.inert=0;
+
+    // 새 실험은 동일한 기준 시료를 새 강철용기에 넣고 해당 부피에서
+    // 이미 평형에 도달한 상태로 시작한다.
+    const freshSource={no2:.80,n2o4:2.20};
+    const eq=solveGasEquilibrium(freshSource);
+    state.gas={...eq};
+    state.displayGas={...eq};
+    state.targetGas={...eq};
+
+    const now=performance.now();
+    const k=gasK();
+    const q=gasQ(eq,state.volume);
+    const rf=rateForwardGas(eq);
+    const rr=rateReverseGas(eq);
+    const rate=(rf+rr)/2;
+    state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:rate,rfEnd:rate,rrStart:rate,rrEnd:rate,start:now,duration:5000};
+    state.steelResetUntil=now+1500;
+    makeMolecules();
+    updateUI();
   }
 
   $('experiment').addEventListener('change', e=>{
@@ -994,10 +1034,20 @@ APP_HTML = r'''
   $('volume').addEventListener('input',e=>{
     const nextVolume=Number(e.target.value);
     const prevVolume=state.volume;
+
+    if(state.experiment==='gas' && state.vessel==='steel'){
+      // 현실의 강철용기는 실험 중 부피 조절이 불가능하다.
+      // 따라서 슬라이더를 움직이면 기존 평형을 이동시키지 않고,
+      // 선택한 부피의 새 강철용기를 준비해 Q=K인 새 실험으로 즉시 시작한다.
+      startNewSteelExperiment(nextVolume);
+      return;
+    }
+
     state.volume=nextVolume;
     state.displayVolume=state.volume;
     state.volumeAnim=null;
     if(state.experiment==='gas'){
+      // 피스톤 실린더에서는 실제 부피 변화가 교란으로 작용한다.
       // 부피 감소: 순간 압축으로 더 진해짐 → 이후 평형 이동으로 연해짐.
       // 부피 증가: 순간 팽창으로 더 옅어짐 → 이후 평형 이동으로 진해짐.
       triggerGasDensityPulse((prevVolume-nextVolume)*0.78, 1550, .14);
@@ -1066,7 +1116,7 @@ APP_HTML = r'''
     state.chromate.balance = current.balance;
     state.chromate.h = current.h;
     if(act==='hcl') state.chromate.h=clamp(state.chromate.h + amt*1.25,.15,2.4);
-    if(act==='naoh') state.chromate.h=clamp(state.chromate.h - amt*1.35,.15,2.4);
+    if(act==='naoh') state.chromate.h=clamp(state.chromate.h - amt*1.75,.12,2.4);
     if(act==='water'){ state.chromate.h=clamp(state.chromate.h - amt*.85,.15,2.4); state.chromate.dilution=clamp(state.chromate.dilution+amt*.70,0,1.6); }
     state.displayChromate = {...current, h:state.chromate.h, dilution:state.chromate.dilution};
     startTransition(solveChromateEquilibrium(state.chromate));
