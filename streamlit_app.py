@@ -309,9 +309,17 @@ APP_HTML = r'''
             <option value="naoh">NaOH 첨가</option>
             <option value="water">H₂O 첨가</option>
           </select>
+          <div id="hclConcGroup" class="range-wrap">
+            <div class="range-label"><span>HCl 수용액 몰농도 (M)</span><span id="hclConcVal" class="range-value">1.00</span></div>
+            <input id="hclConc" type="range" min="0.10" max="3.00" step="0.10" value="1.00" />
+          </div>
+          <div id="naohConcGroup" class="range-wrap">
+            <div class="range-label"><span>NaOH 수용액 몰농도 (M)</span><span id="naohConcVal" class="range-value">1.00</span></div>
+            <input id="naohConc" type="range" min="0.10" max="3.00" step="0.10" value="1.00" />
+          </div>
           <div class="range-wrap">
-            <div class="range-label"><span>조작량</span><span id="chromateAmountVal" class="range-value">0.40</span></div>
-            <input id="chromateAmount" type="range" min="0.10" max="1.00" step="0.05" value="0.40" />
+            <div class="range-label"><span id="chromateAmountLabel">첨가 몰수 (mol)</span><span id="chromateAmountVal" class="range-value">0.10</span></div>
+            <input id="chromateAmount" type="range" min="0.05" max="0.50" step="0.05" value="0.10" />
           </div>
           <div class="button-row">
             <button id="applyChromate">적용</button>
@@ -388,15 +396,17 @@ APP_HTML = r'''
   const state = {
     experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0,
     gas:{no2:0.80, n2o4:2.20},
-    chromate:{balance:0.58, h:1.0, dilution:0.0},
+    chromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.20, solutionVolume:1.00},
     displayGas:{no2:0.80, n2o4:2.20},
-    displayChromate:{balance:0.58, h:1.0, dilution:0.0},
+    displayChromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.20, solutionVolume:1.00},
     targetGas:{no2:0.80,n2o4:2.20},
-    targetChromate:{balance:0.58,h:1.0,dilution:0.0},
+    targetChromate:{balance:0.58,h:1.0,dilution:0.0,netAcid:0.20,solutionVolume:1.00},
     anim:null,
     volumeAnim:null,
     volumePulse:null,
     steelResetUntil:0,
+    referenceGasTotal:3.00,
+    referenceTempK:BASE_TEMP_K,
     molecules:[],
     staticDots:[],
     lastTime:performance.now(),
@@ -429,12 +439,14 @@ APP_HTML = r'''
   function effectiveVolume(g=state.displayGas, rawVolume=state.volume){
     if(state.experiment==='chromate') return 3.40;
     if(state.vessel==='steel') return rawVolume;
-    // 일정 외부 압력 피스톤에서는 V ∝ nT/P가 되도록 교육용으로 과장 반영한다.
-    // 그래서 기체 몰수가 많아질수록 피스톤이 눈에 띄게 위로 올라간다.
-    const molFactor = activeGasTotal(g) / INITIAL_GAS_TOTAL;
-    const tempFactor = (273 + state.temp) / BASE_TEMP_K;
+    // 새 실험을 시작할 때의 기체량을 기준값으로 저장한다.
+    // 따라서 선택한 1·2·3·4 L 용기에서는 처음에 정확히 그 부피와 1 atm 상태로 시작하고,
+    // 이후 압력·온도·기체량 변화에 대해서만 피스톤이 움직인다.
+    const reference = Math.max(0.05, state.referenceGasTotal || INITIAL_GAS_TOTAL);
+    const molFactor = activeGasTotal(g) / reference;
+    const tempFactor = (273 + state.temp) / Math.max(1,state.referenceTempK || BASE_TEMP_K);
     const pressureFactor = Math.max(0.25, state.pressure);
-    return clamp(rawVolume * molFactor * tempFactor / pressureFactor, .85, 4.30);
+    return clamp(rawVolume * molFactor * tempFactor / pressureFactor, .55, 4.60);
   }
   function visualEffectiveVolume(){
     const v = state.displayVolume ?? state.volume;
@@ -475,6 +487,20 @@ APP_HTML = r'''
     const cN2O4 = Math.max(g.n2o4/vol, 1e-6);
     return cN2O4/(cNO2*cNO2);
   }
+  function solveGasEquilibriumAtFixedVolume(sourceGas, fixedVolume){
+    const K = gasK();
+    const total = Math.max(sourceGas.no2 + 2*sourceGas.n2o4, .08);
+    let lo=0, hi=total/2-1e-5;
+    for(let i=0;i<90;i++){
+      const b=(lo+hi)/2;
+      const a=Math.max(total-2*b,1e-7);
+      const val = b*fixedVolume/(a*a);
+      if(val < K) lo=b; else hi=b;
+    }
+    const n2o4=(lo+hi)/2;
+    return {no2:Math.max(total-2*n2o4,0.0001), n2o4:Math.max(n2o4,0.0001)};
+  }
+
   function solveGasEquilibrium(sourceGas){
     const K = gasK();
     const total = Math.max(sourceGas.no2 + 2*sourceGas.n2o4, .08);
@@ -492,6 +518,17 @@ APP_HTML = r'''
     const n2o4=(lo+hi)/2;
     return {no2:Math.max(total-2*n2o4,0.0001), n2o4:Math.max(n2o4,0.0001)};
   }
+  function acidityIndex(netAcid, solutionVolume){
+    const v=Math.max(0.05,solutionVolume||1);
+    const netConc=netAcid/v;
+    // 양수면 산성, 0이면 중성 부근, 음수면 염기성이다.
+    return clamp(1 + netConc/0.20, 0.05, 2.80);
+  }
+  function chromateSpecies(ch=state.displayChromate){
+    const net=Number.isFinite(ch.netAcid)?ch.netAcid:0;
+    return {hMol:Math.max(net,0), ohMol:Math.max(-net,0)};
+  }
+
   function chromateK(){
     // 평형상수 K는 온도가 같으면 일정해야 한다.
     // H₂O, HCl, NaOH 첨가는 Q와 조성만 바꾸고 K 자체는 바꾸지 않는다.
@@ -512,7 +549,7 @@ APP_HTML = r'''
     const h = source.h;
     const dilution = Number.isFinite(source.dilution) ? source.dilution : (state.chromate.dilution || 0);
     const balance = clamp((K - 1.05 - (h-1)*chromateHFactor() + dilution*chromateDilutionFactor()) / 5.7, 0.08, 0.94);
-    return {balance, h, dilution};
+    return {balance, h, dilution, netAcid:source.netAcid, solutionVolume:source.solutionVolume};
   }
 
   function startTransition(target, reason='condition'){
@@ -548,11 +585,6 @@ APP_HTML = r'''
   function rateReverseGas(g=state.displayGas){
     const c = Math.max(g.n2o4/effectiveVolume(g),0.001);
     return clamp(0.08 + c*0.32 + state.temp/1100, .03, 2.2);
-  }
-  function gasRates(g=state.displayGas){
-    // 정반응·역반응 속도를 한 번에 반환하는 보조 함수다.
-    // 초기화 및 강철용기 He 첨가 처리에서 사용한다.
-    return {forward:rateForwardGas(g), reverse:rateReverseGas(g)};
   }
   function rateForwardChromate(ch=state.displayChromate){ return clamp(0.25 + (1-ch.balance)*0.65 + state.temp/580, .08, 1.4); }
   function rateReverseChromate(ch=state.displayChromate){ return clamp(0.22 + ch.balance*0.55 + ch.h*.08, .08, 1.4); }
@@ -691,9 +723,10 @@ APP_HTML = r'''
 
     // 분자 수와 색 비율을 눈에 띄게 반영
     const totalMoles = state.displayGas.no2 + state.displayGas.n2o4;
-    const no2Need = Math.round(clamp(10 + no2Frac*32, 8, 42));
-    const n2o4Need = Math.round(clamp(8 + (1-no2Frac)*22, 5, 30));
-    const heNeed = Math.round(clamp(state.inert*14, 0, 32));
+    const amountScale = clamp((activeGasTotal(state.displayGas)/Math.max(state.referenceGasTotal,0.05))*(state.volume/2), .28, 2.25);
+    const no2Need = Math.round(clamp((10 + no2Frac*32)*amountScale, 3, 72));
+    const n2o4Need = Math.round(clamp((8 + (1-no2Frac)*22)*amountScale, 2, 55));
+    const heNeed = Math.round(clamp(state.inert*14*amountScale, 0, 42));
     let desired = no2Need + n2o4Need + heNeed;
     while(state.molecules.length<desired){
       state.molecules.push({kind:'no2',x:pg.x+45+Math.random()*(pg.w-90),y:pg.gasTop+25+Math.random()*(pg.gasBottom-pg.gasTop-50),vx:Math.random()*2-1,vy:Math.random()*2-1,r:7+Math.random()*2});
@@ -939,7 +972,10 @@ APP_HTML = r'''
     } else {
       state.displayChromate.balance = lerp(state.anim.start.balance,state.anim.target.balance,e);
       state.displayChromate.h = lerp(state.anim.start.h,state.anim.target.h,e);
-      if(t>=1){ state.chromate.balance=state.anim.target.balance; state.chromate.h=state.anim.target.h; state.chromate.dilution=state.anim.target.dilution || 0; state.displayChromate={...state.anim.target}; state.anim=null; }
+      state.displayChromate.netAcid = lerp(state.anim.start.netAcid ?? 0,state.anim.target.netAcid ?? 0,e);
+      state.displayChromate.solutionVolume = lerp(state.anim.start.solutionVolume ?? 1,state.anim.target.solutionVolume ?? 1,e);
+      state.displayChromate.dilution = lerp(state.anim.start.dilution ?? 0,state.anim.target.dilution ?? 0,e);
+      if(t>=1){ state.chromate={...state.anim.target}; state.displayChromate={...state.anim.target}; state.anim=null; }
     }
   }
 
@@ -949,6 +985,12 @@ APP_HTML = r'''
     $('volumeVal').textContent=String(Math.round(state.volume));
     $('gasAmountVal').textContent=fmt(Number($('gasAmount').value),2);
     $('chromateAmountVal').textContent=fmt(Number($('chromateAmount').value),2);
+    $('hclConcVal').textContent=fmt(Number($('hclConc').value),2);
+    $('naohConcVal').textContent=fmt(Number($('naohConc').value),2);
+    const chromateAct=$('chromateAction').value;
+    $('hclConcGroup').classList.toggle('hidden',chromateAct!=='hcl');
+    $('naohConcGroup').classList.toggle('hidden',chromateAct!=='naoh');
+    $('chromateAmountLabel').textContent=chromateAct==='water'?'첨가 물의 부피 (L)':'첨가 몰수 (mol)';
     $('vesselBox').classList.toggle('hidden',state.experiment==='chromate');
     $('pressureGroup').classList.toggle('hidden',state.experiment==='chromate');
     $('volumeGroup').classList.toggle('hidden',state.experiment==='chromate');
@@ -994,9 +1036,12 @@ APP_HTML = r'''
       } else {
         $('badges').innerHTML='<span class="badge">평형</span>';
       }
-      $('formula').innerHTML='<b>계산식</b><br><code>Cr₂O₇²⁻ + H₂O ⇌ 2CrO₄²⁻ + 2H⁺</code><br><code>산성: H⁺ 증가 → 왼쪽 이동</code><br><code>염기성: H⁺ 감소 → 오른쪽 이동</code>';
+      const species=chromateSpecies(state.displayChromate);
+      const targetSpecies=chromateSpecies(state.targetChromate);
+      const acidBaseLabel=species.hMol>1e-6?'산성':species.ohMol>1e-6?'염기성':'중성 부근';
+      $('formula').innerHTML='<b>계산식</b><br><code>HCl → H⁺ 1 mol 제공</code><br><code>NaOH의 OH⁻ + H⁺ → H₂O (1:1)</code><br><code>남은 H⁺가 0이 된 뒤에는 OH⁻가 축적되어 염기성이 됩니다.</code>';
       const orange=(1-b), yellow=b;
-      $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(state.displayChromate.h,2)}</td><td>${fmt(state.targetChromate.h,2)}</td><td>산성도</td></tr>`;
+      $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(species.hMol,3)} mol</td><td>${fmt(targetSpecies.hMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>OH⁻</td><td>${fmt(species.ohMol,3)} mol</td><td>${fmt(targetSpecies.ohMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>용액 부피</td><td>${fmt(state.displayChromate.solutionVolume,3)} L</td><td>${fmt(state.targetChromate.solutionVolume,3)} L</td><td>시약 용액 포함</td></tr>`;
       $('caption').innerHTML='';
     }
   }
@@ -1019,8 +1064,9 @@ APP_HTML = r'''
     const now=performance.now();
     const k=gasK();
     const q=gasQ(eq, effectiveVolume(eq, state.volume));
-    const rates=gasRates(eq, effectiveVolume(eq, state.volume));
-    const rate=(rates.forward+rates.reverse)/2;
+    const forward=rateForwardGas(eq);
+    const reverse=rateReverseGas(eq);
+    const rate=(forward+reverse)/2;
     state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:rate,rfEnd:rate,rrStart:rate,rrEnd:rate,start:now,duration:5000};
   }
 
@@ -1038,10 +1084,24 @@ APP_HTML = r'''
     $('volume').value=String(state.volume);
     $('pressure').value=String(state.pressure);
 
-    // 같은 기준 시료를 선택한 새 용기에 넣고, 그 조건에서 이미 평형에 도달한
-    // 상태(Q=K)로 시작한다. 따라서 부피 선택 순간에는 피스톤 이동 애니메이션이나
-    // 순간 색 변화가 나타나지 않는다.
-    setGasEquilibriumImmediately({no2:.80,n2o4:2.20});
+    // 2 L 기준 시료의 몰수를 선택 부피에 비례해 조정한다.
+    // 예: 1 L 새 실험은 2 L 실험의 절반 몰수로 시작하므로, 온도와 압력이 같을 때
+    // 농도와 부분압력이 유지되어 1 atm이라는 설정이 납득 가능하다.
+    const scale=state.volume/2;
+    const source={no2:.80*scale,n2o4:2.20*scale};
+    const eq=solveGasEquilibriumAtFixedVolume(source,state.volume);
+    state.referenceGasTotal=Math.max(0.05,eq.no2+eq.n2o4);
+    state.referenceTempK=273+state.temp;
+    state.gas={...eq};
+    state.displayGas={...eq};
+    state.targetGas={...eq};
+    state.anim=null;
+    const now=performance.now();
+    const k=gasK();
+    const q=gasQ(eq,state.volume);
+    const forward=rateForwardGas(eq), reverse=rateReverseGas(eq);
+    const rate=(forward+reverse)/2;
+    state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:rate,rfEnd:rate,rrStart:rate,rrEnd:rate,start:now,duration:5000};
     state.steelResetUntil=showMessage ? performance.now()+1800 : 0;
     makeMolecules();
     updateUI();
@@ -1055,7 +1115,10 @@ APP_HTML = r'''
     startNewGasExperiment(2,false);
   }
   function resetChromate(){
-    state.temp=43;state.chromate={balance:.58,h:1.0,dilution:0};state.displayChromate={balance:.58,h:1.0,dilution:0};
+    state.temp=43;
+    state.chromate={balance:.58,h:acidityIndex(.20,1.00),dilution:0,netAcid:.20,solutionVolume:1.00};
+    state.displayChromate={...state.chromate};
+    state.targetChromate={...state.chromate};
     $('temp').value=state.temp;
     startTransition(solveChromateEquilibrium(state.chromate));
   }
@@ -1089,6 +1152,9 @@ APP_HTML = r'''
   });
   $('gasAmount').addEventListener('input',updateUI);
   $('chromateAmount').addEventListener('input',updateUI);
+  $('hclConc').addEventListener('input',updateUI);
+  $('naohConc').addEventListener('input',updateUI);
+  $('chromateAction').addEventListener('change',updateUI);
   $('moleculeMotion').addEventListener('change',e=>{state.motion=e.target.checked;});
   $('applyGas').addEventListener('click',()=>{
     const amt=Number($('gasAmount').value); const act=$('gasAction').value;
@@ -1122,10 +1188,11 @@ APP_HTML = r'''
       // 불필요한 평형 전환 애니메이션도 시작하지 않고 현재 K=Q 상태를 유지한다.
       const q=gasQ(state.displayGas, state.volume);
       const k=gasK();
-      const rates=gasRates(state.displayGas, state.volume);
+      const forward=rateForwardGas(state.displayGas);
+      const reverse=rateReverseGas(state.displayGas);
       state.targetGas={...state.displayGas};
       state.anim=null;
-      state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:rates.forward,rfEnd:rates.forward,rrStart:rates.reverse,rrEnd:rates.reverse,start:performance.now(),duration:5000};
+      state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:forward,rfEnd:forward,rrStart:reverse,rrEnd:reverse,start:performance.now(),duration:5000};
       updateUI();
     } else {
       startTransition(solveGasEquilibrium(src));
@@ -1133,17 +1200,30 @@ APP_HTML = r'''
   });
   $('resetGas').addEventListener('click',resetGas);
   $('applyChromate').addEventListener('click',()=>{
-    const amt=Number($('chromateAmount').value); const act=$('chromateAction').value;
-    // 시약을 넣는 순간에는 색 비율은 아직 그대로이고 H+만 먼저 바뀐 상태가 된다.
-    // 이 '교란 직후' 상태를 출발점으로 삼아야 HCl/NaOH에서도 Q와 K가 어긋난 뒤
-    // 다시 평형으로 이동하는 과정이 제대로 보인다.
-    const current = {...state.displayChromate};
-    state.chromate.balance = current.balance;
-    state.chromate.h = current.h;
-    if(act==='hcl') state.chromate.h=clamp(state.chromate.h + amt*1.25,.15,2.4);
-    if(act==='naoh') state.chromate.h=clamp(state.chromate.h - amt*1.75,.12,2.4);
-    if(act==='water'){ state.chromate.h=clamp(state.chromate.h - amt*.85,.15,2.4); state.chromate.dilution=clamp(state.chromate.dilution+amt*.70,0,1.6); }
-    state.displayChromate = {...current, h:state.chromate.h, dilution:state.chromate.dilution};
+    const amt=Number($('chromateAmount').value);
+    const act=$('chromateAction').value;
+    const current={...state.displayChromate};
+    state.chromate={...current};
+
+    if(act==='hcl'){
+      const concentration=Math.max(.01,Number($('hclConc').value));
+      state.chromate.netAcid=(state.chromate.netAcid||0)+amt;
+      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+amt/concentration;
+    }
+    if(act==='naoh'){
+      const concentration=Math.max(.01,Number($('naohConc').value));
+      // OH⁻와 H⁺는 1:1로 중화된다. 따라서 NaOH 0.10 mol을 넣으면
+      // 남아 있는 H⁺가 정확히 0.10 mol 감소하며, H⁺가 모두 소모된 뒤에는
+      // 초과 OH⁻가 축적되어 용액이 염기성으로 바뀐다.
+      state.chromate.netAcid=(state.chromate.netAcid||0)-amt;
+      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+amt/concentration;
+    }
+    if(act==='water'){
+      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+amt;
+      state.chromate.dilution=clamp((state.chromate.dilution||0)+amt*.70,0,2.5);
+    }
+    state.chromate.h=acidityIndex(state.chromate.netAcid||0,state.chromate.solutionVolume||1);
+    state.displayChromate={...current,h:state.chromate.h,netAcid:state.chromate.netAcid,solutionVolume:state.chromate.solutionVolume,dilution:state.chromate.dilution||0};
     startTransition(solveChromateEquilibrium(state.chromate));
   });
   $('resetChromate').addEventListener('click',resetChromate);
@@ -1154,6 +1234,9 @@ APP_HTML = r'''
     }
   }
 
+  state.chromate.h=acidityIndex(state.chromate.netAcid,state.chromate.solutionVolume);
+  state.displayChromate={...state.chromate};
+  state.targetChromate={...state.chromate};
   makeMolecules();makeStaticDots();
   window.addEventListener('resize',()=>{drawStage();drawCharts();});
   startNewGasExperiment(2,false);
