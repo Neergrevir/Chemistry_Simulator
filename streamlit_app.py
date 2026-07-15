@@ -66,6 +66,8 @@ APP_HTML = r'''
   .range-label{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;font-size:12.8px;color:#39465c;font-weight:700;gap:6px;}
   .range-value{color:var(--pink);font-weight:900;}
   input[type=range]{width:100%;height:6px;accent-color:var(--pink);}
+  input[type=range]:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.35);}
+  .fixed-control{opacity:.78;}
   .inline-select{width:100%;height:36px;border:1px solid #d6e1ed;border-radius:10px;padding:0 8px;background:#f4f7fb;color:#263247;font-weight:700;outline:none;font-size:13px;}
   .button-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
   button{border:0;border-radius:11px;background:#151b2b;color:white;height:36px;font-weight:800;cursor:pointer;box-shadow:0 7px 15px rgba(21,27,43,.12);transition:transform .12s ease,opacity .12s ease;}
@@ -529,6 +531,10 @@ APP_HTML = r'''
     return {hMol:Math.max(net,0), ohMol:Math.max(-net,0)};
   }
 
+  // balance가 1만큼 증가하는 것은 정반응 진행량의 시각적 지표이다.
+  // 정반응 1회마다 H⁺가 2 mol 생성되므로 H⁺/OH⁻ 몰수도 함께 바뀐다.
+  const CHROMATE_REACTION_POOL = 0.25;
+
   function chromateK(){
     // 평형상수 K는 온도가 같으면 일정해야 한다.
     // H₂O, HCl, NaOH 첨가는 Q와 조성만 바꾸고 K 자체는 바꾸지 않는다.
@@ -543,13 +549,29 @@ APP_HTML = r'''
     return 1.05 + ch.balance*5.7 + (ch.h-1)*chromateHFactor() - dilution*chromateDilutionFactor();
   }
   function solveChromateEquilibrium(source){
-    // 최종 평형 상태에서는 반드시 Q = K가 되도록 balance를 역산한다.
-    // 단, K는 온도에만 의존하고 물/산/염기 첨가로 직접 변하지 않는다.
+    // 평형 이동에 따라 크로메이트/다이크로메이트 조성뿐 아니라 H⁺도 함께 변한다.
+    // 정반응이면 H⁺가 생성되고 역반응이면 H⁺가 소비된다.
     const K = chromateK();
-    const h = source.h;
     const dilution = Number.isFinite(source.dilution) ? source.dilution : (state.chromate.dilution || 0);
-    const balance = clamp((K - 1.05 - (h-1)*chromateHFactor() + dilution*chromateDilutionFactor()) / 5.7, 0.08, 0.94);
-    return {balance, h, dilution, netAcid:source.netAcid, solutionVolume:source.solutionVolume};
+    const volume = Math.max(0.05, source.solutionVolume || 1);
+    const startBalance = clamp(source.balance,0.08,0.94);
+    const startNetAcid = Number.isFinite(source.netAcid) ? source.netAcid : 0;
+
+    function candidateAt(balance){
+      const reactionExtent = (balance-startBalance)*CHROMATE_REACTION_POOL;
+      const netAcid = startNetAcid + 2*reactionExtent;
+      const h = acidityIndex(netAcid,volume);
+      const candidate={balance,h,dilution,netAcid,solutionVolume:volume};
+      return {candidate,q:chromateQ(candidate)};
+    }
+
+    let lo=0.08, hi=0.94;
+    for(let i=0;i<90;i++){
+      const mid=(lo+hi)/2;
+      const {q}=candidateAt(mid);
+      if(q<K) lo=mid; else hi=mid;
+    }
+    return candidateAt((lo+hi)/2).candidate;
   }
 
   function startTransition(target, reason='condition'){
@@ -991,6 +1013,14 @@ APP_HTML = r'''
     $('hclConcGroup').classList.toggle('hidden',chromateAct!=='hcl');
     $('naohConcGroup').classList.toggle('hidden',chromateAct!=='naoh');
     $('chromateAmountLabel').textContent=chromateAct==='water'?'첨가 물의 부피 (L)':'첨가 몰수 (mol)';
+    const steelPressureFixed = state.experiment==='gas' && state.vessel==='steel';
+    $('pressure').disabled = steelPressureFixed;
+    $('pressureGroup').classList.toggle('fixed-control',steelPressureFixed);
+    if(steelPressureFixed){
+      state.pressure=1.00;
+      $('pressure').value='1.00';
+      $('pressureVal').textContent='1.00 (고정)';
+    }
     $('vesselBox').classList.toggle('hidden',state.experiment==='chromate');
     $('pressureGroup').classList.toggle('hidden',state.experiment==='chromate');
     $('volumeGroup').classList.toggle('hidden',state.experiment==='chromate');
@@ -1000,7 +1030,9 @@ APP_HTML = r'''
     if(state.experiment==='gas'){
       $('leftEquation').textContent='2NO₂(g) ⇌ N₂O₄(g)';
       $('stageTitle').textContent='2NO₂(g) ⇌ N₂O₄(g)';
-      $('containerNote').textContent='용기 부피는 1·2·3·4 L 중 하나를 선택하며, 변경하면 새 실험으로 초기화됩니다.';
+      $('containerNote').textContent=state.vessel==='steel'
+        ? '강철용기는 압력 조건을 1.00 atm으로 고정합니다. 부피 선택은 새 실험으로 초기화됩니다.'
+        : '용기 부피는 1·2·3·4 L 중 하나를 선택하며, 변경하면 새 실험으로 초기화됩니다.';
       $('legend').innerHTML='<span class="legend-chip"><span class="legend-dot" style="background:#d97836"></span>NO₂ 적갈색</span><span class="legend-chip"><span class="legend-dot" style="background:#eef5ff;border:1px solid #7d8ea1"></span>N₂O₄ 무색</span>' + (state.inert>0.01 ? '<span class="legend-chip"><span class="legend-dot" style="background:#d8efff;border:1px solid #5791be"></span>He 헬륨</span>' : '');
       const K=gasK(), Q=gasQ(), dir=directionFrom(Q,K), V=effectiveVolume(state.displayGas);
       $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent=fmt(V,2)+' L';
@@ -1039,7 +1071,7 @@ APP_HTML = r'''
       const species=chromateSpecies(state.displayChromate);
       const targetSpecies=chromateSpecies(state.targetChromate);
       const acidBaseLabel=species.hMol>1e-6?'산성':species.ohMol>1e-6?'염기성':'중성 부근';
-      $('formula').innerHTML='<b>계산식</b><br><code>HCl → H⁺ 1 mol 제공</code><br><code>NaOH의 OH⁻ + H⁺ → H₂O (1:1)</code><br><code>남은 H⁺가 0이 된 뒤에는 OH⁻가 축적되어 염기성이 됩니다.</code>';
+      $('formula').innerHTML='<b>계산식</b><br><code>HCl → H⁺ 1 mol 제공</code><br><code>NaOH의 OH⁻ + H⁺ → H₂O (1:1)</code><br><code>정반응: H⁺ 생성 · 역반응: H⁺ 소비</code><br><code>남은 H⁺가 0이 된 뒤에는 OH⁻가 축적되어 염기성이 됩니다.</code>';
       const orange=(1-b), yellow=b;
       $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(species.hMol,3)} mol</td><td>${fmt(targetSpecies.hMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>OH⁻</td><td>${fmt(species.ohMol,3)} mol</td><td>${fmt(targetSpecies.ohMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>용액 부피</td><td>${fmt(state.displayChromate.solutionVolume,3)} L</td><td>${fmt(state.targetChromate.solutionVolume,3)} L</td><td>시약 용액 포함</td></tr>`;
       $('caption').innerHTML='';
@@ -1128,9 +1160,20 @@ APP_HTML = r'''
     if(state.experiment==='gas') startTransition(solveGasEquilibrium(state.displayGas));
     else startTransition(solveChromateEquilibrium(state.chromate));
   });
-  document.querySelectorAll('input[name="vessel"]').forEach(r=>r.addEventListener('change',e=>{state.vessel=e.target.value;applyConditionChange();}));
+  document.querySelectorAll('input[name="vessel"]').forEach(r=>r.addEventListener('change',e=>{
+    state.vessel=e.target.value;
+    state.pressure=1.00;
+    $('pressure').value='1.00';
+    startNewGasExperiment(state.volume,true);
+  }));
   $('temp').addEventListener('input',e=>{state.temp=Number(e.target.value);applyConditionChange();});
   $('pressure').addEventListener('input',e=>{
+    if(state.vessel==='steel'){
+      state.pressure=1.00;
+      e.target.value='1.00';
+      updateUI();
+      return;
+    }
     const nextPressure=Number(e.target.value);
     const prevPressure=state.pressure;
     state.pressure=nextPressure;
