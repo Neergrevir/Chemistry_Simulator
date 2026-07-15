@@ -492,6 +492,17 @@ APP_HTML = r'''
     const signedStrength = Math.sign(compressionSignal) * clamp(Math.sqrt(Math.abs(compressionSignal)), 0, 1);
     state.volumePulse = {amount:signedStrength*maxAmount, start:performance.now(), duration};
   }
+  function triggerHeliumDilutionPulse(beforeVolume, afterVolume, amount){
+    if(state.experiment!=='gas' || state.vessel!=='cylinder') return;
+    if(!Number.isFinite(beforeVolume) || !Number.isFinite(afterVolume) || afterVolume<=beforeVolume) return;
+    // He 첨가 자체는 농도 계산을 바꾸는 원인이 아니라, 피스톤 팽창으로 부피를 키운다.
+    // 색 변화는 계산값이 아니라 시각 효과로만 약간 강조해서,
+    // 'He 첨가 직후 연해짐 → 역반응으로 조금 진해짐'이 눈에 보이게 한다.
+    const relativeExpansion = clamp((afterVolume-beforeVolume)/Math.max(beforeVolume,0.2), 0, .45);
+    const amountBoost = clamp(amount/0.30, .35, 2.2);
+    const strength = clamp(Math.sqrt(relativeExpansion*3.4)*amountBoost, .10, .62);
+    state.volumePulse = {amount:-strength*.28, start:performance.now(), duration:2200};
+  }
   function animatePistonByEquilibrium(startGas,targetGas){
     if(state.experiment!=='gas' || state.vessel!=='cylinder') return;
     // 평형 이동에 따른 피스톤 움직임은 state.volume을 직접 바꾸지 않는다.
@@ -1295,6 +1306,7 @@ APP_HTML = r'''
       // 그 직후부터 반응 기체 조성만 5초 동안 새 평형으로 이동한다.
       state.displayInert=state.inert;
       state.inertAnim=null;
+      // He로 인한 색 변화는 실린더 분기에서 부피 증가량을 기준으로 별도 처리한다.
       state.volumePulse=null;
     }
 
@@ -1313,6 +1325,7 @@ APP_HTML = r'''
         // 1단계: He 전량 첨가 직후의 부피는 즉시 반영한다.
         const beforeHeVolume=effectiveVolume(src,state.volume,state.inert-amt);
         const immediateVolume=effectiveVolume(src,state.volume,state.inert);
+        triggerHeliumDilutionPulse(beforeHeVolume, immediateVolume, amt);
 
         // 실제 계산값은 그대로 두되, 피스톤 그림만 교육적으로 더 크게 움직인다.
         // 1차: He 첨가에 따른 즉시 팽창을 약 2.4배 강조한다.
