@@ -1064,7 +1064,7 @@ APP_HTML = r'''
       $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent=fmt(V,2)+' L';
       const no2Frac=state.displayGas.no2/(state.displayGas.no2+state.displayGas.n2o4+1e-6);
       $('badges').innerHTML=`<span class="badge">${dir==='정반응'?'N₂O₄ 생성 증가':dir==='역반응'?'NO₂ 생성 증가':'K = Q 평형'}</span><span class="badge">NO₂ 비율 ${(no2Frac*100).toFixed(0)}%</span>${state.inert>0.01?`<span class="badge">He ${fmt(state.inert,2)} mol</span>`:''}`;
-      $('formula').innerHTML='<b>화학 반응 정보</b><br><code>정반응: 발열반응</code><br><code>역반응: 흡열반응</code>';
+      $('formula').innerHTML='<b>화학 반응 정보</b><br><code>정반응: 발열반응 / 분자 수 감소</code><br><code>역반응: 흡열반응 / 분자 수 증가</code>';
       const eq=state.targetGas; const rows=[
         ['NO₂', state.displayGas.no2, eq.no2, state.displayGas.no2/V], ['N₂O₄', state.displayGas.n2o4, eq.n2o4, state.displayGas.n2o4/V]
       ];
@@ -1097,7 +1097,7 @@ APP_HTML = r'''
       const species=chromateSpecies(state.displayChromate);
       const targetSpecies=chromateSpecies(state.targetChromate);
       const acidBaseLabel=species.hMol>1e-6?'산성':species.ohMol>1e-6?'염기성':'중성 부근';
-      $('formula').innerHTML='<b>화학 반응 정보</b><br><code>정반응: 흡열반응</code><br><code>역반응: 발열반응</code><br><code>산/염기 수용액 첨가: H⁺이온 수 변화 + 전체 용액 부피 증가에 따른 몰농도 변화</code>';
+      $('formula').innerHTML='<b>화학 반응 정보</b><br><code>정반응: 흡열반응</code><br><code>역반응: 발열반응</code><br><code>산/염기 수용액 첨가: H⁺이온 수 변화 + 전체 용액 부피 증가에 따른 몰농도 변화</code><br><code>물 첨가: 전체 용액 부피 증가에 따른 몰농도 변화</code>';
       const orange=(1-b), yellow=b;
       $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(species.hMol,3)} mol</td><td>${fmt(targetSpecies.hMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>OH⁻</td><td>${fmt(species.ohMol,3)} mol</td><td>${fmt(targetSpecies.ohMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>용액 부피</td><td>${fmt(state.displayChromate.solutionVolume,3)} L</td><td>${fmt(state.targetChromate.solutionVolume,3)} L</td><td>시약 용액 포함</td></tr>`;
       $('caption').innerHTML='';
