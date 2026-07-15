@@ -319,8 +319,11 @@ APP_HTML = r'''
             <div class="range-label"><span>NaOH 수용액 몰농도 (M)</span><span id="naohConcVal" class="range-value">1.00</span></div>
             <input id="naohConc" type="range" min="0.10" max="3.00" step="0.10" value="1.00" />
           </div>
-          <div class="range-wrap">
-            <div class="range-label"><span id="chromateAmountLabel">첨가 몰수 (mol)</span><span id="chromateAmountVal" class="range-value">0.10</span></div>
+          <div id="reagentVolumeInfo" class="range-wrap">
+            <div class="range-label"><span>한 번에 첨가되는 수용액 부피</span><span class="range-value">0.10 L</span></div>
+          </div>
+          <div id="chromateAmountGroup" class="range-wrap hidden">
+            <div class="range-label"><span id="chromateAmountLabel">첨가 물의 부피 (L)</span><span id="chromateAmountVal" class="range-value">0.10</span></div>
             <input id="chromateAmount" type="range" min="0.05" max="0.50" step="0.05" value="0.10" />
           </div>
           <div class="button-row">
@@ -398,11 +401,11 @@ APP_HTML = r'''
   const state = {
     experiment:'gas', vessel:'cylinder', temp:43, pressure:1.0, volume:2.0, displayVolume:2.0, inert:0.0,
     gas:{no2:0.80, n2o4:2.20},
-    chromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.20, solutionVolume:1.00},
+    chromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.05, solutionVolume:1.00},
     displayGas:{no2:0.80, n2o4:2.20},
-    displayChromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.20, solutionVolume:1.00},
+    displayChromate:{balance:0.58, h:1.0, dilution:0.0, netAcid:0.05, solutionVolume:1.00},
     targetGas:{no2:0.80,n2o4:2.20},
-    targetChromate:{balance:0.58,h:1.0,dilution:0.0,netAcid:0.20,solutionVolume:1.00},
+    targetChromate:{balance:0.58,h:1.0,dilution:0.0,netAcid:0.05,solutionVolume:1.00},
     anim:null,
     volumeAnim:null,
     volumePulse:null,
@@ -1012,7 +1015,9 @@ APP_HTML = r'''
     const chromateAct=$('chromateAction').value;
     $('hclConcGroup').classList.toggle('hidden',chromateAct!=='hcl');
     $('naohConcGroup').classList.toggle('hidden',chromateAct!=='naoh');
-    $('chromateAmountLabel').textContent=chromateAct==='water'?'첨가 물의 부피 (L)':'첨가 몰수 (mol)';
+    $('reagentVolumeInfo').classList.toggle('hidden',chromateAct==='water');
+    $('chromateAmountGroup').classList.toggle('hidden',chromateAct!=='water');
+    $('chromateAmountLabel').textContent='첨가 물의 부피 (L)';
     const steelPressureFixed = state.experiment==='gas' && state.vessel==='steel';
     $('pressure').disabled = steelPressureFixed;
     $('pressureGroup').classList.toggle('fixed-control',steelPressureFixed);
@@ -1071,7 +1076,7 @@ APP_HTML = r'''
       const species=chromateSpecies(state.displayChromate);
       const targetSpecies=chromateSpecies(state.targetChromate);
       const acidBaseLabel=species.hMol>1e-6?'산성':species.ohMol>1e-6?'염기성':'중성 부근';
-      $('formula').innerHTML='<b>계산식</b><br><code>HCl → H⁺ 1 mol 제공</code><br><code>NaOH의 OH⁻ + H⁺ → H₂O (1:1)</code><br><code>정반응: H⁺ 생성 · 역반응: H⁺ 소비</code><br><code>시약 수용액 첨가 → 전체 용액 부피 증가 → 희석 효과</code><br><code>H⁺가 0이 된 뒤에도 NaOH 수용액의 부피 증가로 정반응 이동이 계속됩니다.</code>';
+      $('formula').innerHTML='<b>계산식</b><br><code>HCl 첨가 몰수 = 몰농도 × 0.10 L</code><br><code>NaOH 첨가 몰수 = 몰농도 × 0.10 L</code><br><code>OH⁻ + H⁺ → H₂O (1:1)</code><br><code>정반응: H⁺ 생성 · 역반응: H⁺ 소비</code><br><code>시약 수용액 첨가 → 전체 용액 부피 증가 → 희석 효과</code><br><code>H⁺가 0이 된 뒤에도 NaOH 수용액의 부피 증가로 정반응 이동이 계속됩니다.</code>';
       const orange=(1-b), yellow=b;
       $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(species.hMol,3)} mol</td><td>${fmt(targetSpecies.hMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>OH⁻</td><td>${fmt(species.ohMol,3)} mol</td><td>${fmt(targetSpecies.ohMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>용액 부피</td><td>${fmt(state.displayChromate.solutionVolume,3)} L</td><td>${fmt(state.targetChromate.solutionVolume,3)} L</td><td>시약 용액 포함</td></tr>`;
       $('caption').innerHTML='';
@@ -1148,7 +1153,7 @@ APP_HTML = r'''
   }
   function resetChromate(){
     state.temp=43;
-    state.chromate={balance:.58,h:acidityIndex(.20,1.00),dilution:0,netAcid:.20,solutionVolume:1.00};
+    state.chromate={balance:.58,h:acidityIndex(.05,1.00),dilution:0,netAcid:.05,solutionVolume:1.00};
     state.displayChromate={...state.chromate};
     state.targetChromate={...state.chromate};
     $('temp').value=state.temp;
@@ -1243,27 +1248,28 @@ APP_HTML = r'''
   });
   $('resetGas').addEventListener('click',resetGas);
   $('applyChromate').addEventListener('click',()=>{
-    const amt=Number($('chromateAmount').value);
+    const waterAmount=Number($('chromateAmount').value);
     const act=$('chromateAction').value;
     const current={...state.displayChromate};
     state.chromate={...current};
+    const reagentVolume=0.10; // HCl·NaOH 수용액은 매번 0.10 L씩 첨가
 
     if(act==='hcl'){
       const concentration=Math.max(.01,Number($('hclConc').value));
-      state.chromate.netAcid=(state.chromate.netAcid||0)+amt;
-      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+amt/concentration;
+      const addedMoles=concentration*reagentVolume;
+      state.chromate.netAcid=(state.chromate.netAcid||0)+addedMoles;
+      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+reagentVolume;
     }
     if(act==='naoh'){
       const concentration=Math.max(.01,Number($('naohConc').value));
-      // OH⁻와 H⁺는 1:1로 중화된다. 따라서 NaOH 0.10 mol을 넣으면
-      // 남아 있는 H⁺가 정확히 0.10 mol 감소하며, H⁺가 모두 소모된 뒤에는
-      // 초과 OH⁻가 축적되어 용액이 염기성으로 바뀐다.
-      state.chromate.netAcid=(state.chromate.netAcid||0)-amt;
-      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+amt/concentration;
+      const addedMoles=concentration*reagentVolume;
+      // OH⁻와 H⁺는 1:1로 중화되며, 남는 OH⁻는 netAcid의 음수로 저장한다.
+      state.chromate.netAcid=(state.chromate.netAcid||0)-addedMoles;
+      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+reagentVolume;
     }
     if(act==='water'){
-      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+amt;
-      state.chromate.dilution=clamp((state.chromate.dilution||0)+amt*.70,0,2.5);
+      state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+waterAmount;
+      state.chromate.dilution=clamp((state.chromate.dilution||0)+waterAmount*.70,0,2.5);
     }
     // HCl·NaOH 수용액도 용매를 포함하므로 첨가할수록 전체 용액 부피가 증가한다.
     // 따라서 H⁺가 이미 모두 중화된 뒤에도 추가 NaOH 수용액의 희석 효과가 Q를 낮추고
