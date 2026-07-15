@@ -284,7 +284,7 @@ APP_HTML = r'''
             <option value="removeNO2">NO₂ 제거</option>
             <option value="addN2O4">N₂O₄ 첨가</option>
             <option value="removeN2O4">N₂O₄ 제거</option>
-            <option value="addInert">H₂ 비활성 기체 첨가</option>
+            <option value="addInert">헬륨(He) 첨가</option>
           </select>
           <div class="range-wrap">
             <div class="range-label"><span>조작량 (mol)</span><span id="gasAmountVal" class="range-value">0.30</span></div>
@@ -585,10 +585,12 @@ APP_HTML = r'''
     if(m.kind==='no2'){
       g.fillStyle='#d97836'; g.strokeStyle='rgba(151,86,44,.35)'; g.lineWidth=1;
       g.beginPath(); g.arc(m.x,m.y,m.r*scale,0,Math.PI*2); g.fill(); g.stroke();
-    } else if(m.kind==='h2'){
-      g.strokeStyle='rgba(87,145,190,.55)'; g.lineWidth=1.8; g.fillStyle='#d8efff';
-      g.beginPath(); g.arc(m.x-m.r*.42,m.y,m.r*.55*scale,0,Math.PI*2); g.fill(); g.stroke();
-      g.beginPath(); g.arc(m.x+m.r*.42,m.y,m.r*.55*scale,0,Math.PI*2); g.fill(); g.stroke();
+    } else if(m.kind==='he'){
+      // 헬륨은 단원자 기체이므로 원자 하나로 표시한다.
+      g.strokeStyle='rgba(87,145,190,.62)'; g.lineWidth=1.8; g.fillStyle='#d8efff';
+      g.beginPath(); g.arc(m.x,m.y,m.r*.72*scale,0,Math.PI*2); g.fill(); g.stroke();
+      g.fillStyle='rgba(255,255,255,.72)';
+      g.beginPath(); g.arc(m.x-m.r*.20,m.y-m.r*.20,m.r*.16*scale,0,Math.PI*2); g.fill();
     } else {
       g.strokeStyle='#8090a3'; g.lineWidth=2; g.fillStyle='#f7fbff';
       g.beginPath(); g.arc(m.x-m.r*.72,m.y,m.r*.86*scale,0,Math.PI*2); g.fill(); g.stroke();
@@ -680,13 +682,13 @@ APP_HTML = r'''
     const totalMoles = state.displayGas.no2 + state.displayGas.n2o4;
     const no2Need = Math.round(clamp(10 + no2Frac*32, 8, 42));
     const n2o4Need = Math.round(clamp(8 + (1-no2Frac)*22, 5, 30));
-    const h2Need = Math.round(clamp(state.inert*14, 0, 32));
-    let desired = no2Need + n2o4Need + h2Need;
+    const heNeed = Math.round(clamp(state.inert*14, 0, 32));
+    let desired = no2Need + n2o4Need + heNeed;
     while(state.molecules.length<desired){
       state.molecules.push({kind:'no2',x:pg.x+45+Math.random()*(pg.w-90),y:pg.gasTop+25+Math.random()*(pg.gasBottom-pg.gasTop-50),vx:Math.random()*2-1,vy:Math.random()*2-1,r:7+Math.random()*2});
     }
     if(state.molecules.length>desired) state.molecules.length=desired;
-    state.molecules.forEach((m,i)=>{m.kind = i<no2Need ? 'no2' : (i<no2Need+n2o4Need ? 'n2o4' : 'h2');});
+    state.molecules.forEach((m,i)=>{m.kind = i<no2Need ? 'no2' : (i<no2Need+n2o4Need ? 'n2o4' : 'he');});
 
     if(state.motion){
       const tempSpeed = lerp(.45,2.75,state.temp/120);
@@ -694,7 +696,7 @@ APP_HTML = r'''
         m.x += m.vx*tempSpeed;
         m.y += m.vy*tempSpeed;
         const left=pg.x+34, right=pg.x+pg.w-34, top=(state.vessel==='cylinder'?pg.gasTop+15:pg.y+45), bottom=pg.gasBottom-18;
-        const rad = m.kind==='no2' ? m.r : (m.kind==='h2' ? m.r*.85 : m.r*1.7);
+        const rad = m.kind==='no2' ? m.r : (m.kind==='he' ? m.r*.75 : m.r*1.7);
         if(m.x-rad<left){m.x=left+rad;m.vx=Math.abs(m.vx)}
         if(m.x+rad>right){m.x=right-rad;m.vx=-Math.abs(m.vx)}
         if(m.y-rad<top){m.y=top+rad;m.vy=Math.abs(m.vy)}
@@ -923,16 +925,16 @@ APP_HTML = r'''
       $('leftEquation').textContent='2NO₂(g) ⇌ N₂O₄(g)';
       $('stageTitle').textContent='2NO₂(g) ⇌ N₂O₄(g)';
       $('containerNote').textContent='';
-      $('legend').innerHTML='<span class="legend-chip"><span class="legend-dot" style="background:#d97836"></span>NO₂ 적갈색</span><span class="legend-chip"><span class="legend-dot" style="background:#eef5ff;border:1px solid #7d8ea1"></span>N₂O₄ 무색</span>' + (state.inert>0.01 ? '<span class="legend-chip"><span class="legend-dot" style="background:#d8efff;border:1px solid #5791be"></span>H₂ 비활성</span>' : '');
+      $('legend').innerHTML='<span class="legend-chip"><span class="legend-dot" style="background:#d97836"></span>NO₂ 적갈색</span><span class="legend-chip"><span class="legend-dot" style="background:#eef5ff;border:1px solid #7d8ea1"></span>N₂O₄ 무색</span>' + (state.inert>0.01 ? '<span class="legend-chip"><span class="legend-dot" style="background:#d8efff;border:1px solid #5791be"></span>He 헬륨</span>' : '');
       const K=gasK(), Q=gasQ(), dir=directionFrom(Q,K), V=effectiveVolume(state.displayGas);
       $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent=fmt(V,2)+' L';
       const no2Frac=state.displayGas.no2/(state.displayGas.no2+state.displayGas.n2o4+1e-6);
-      $('badges').innerHTML=`<span class="badge">${dir==='정반응'?'N₂O₄ 생성 증가':dir==='역반응'?'NO₂ 생성 증가':'K = Q 평형'}</span><span class="badge">NO₂ 비율 ${(no2Frac*100).toFixed(0)}%</span>${state.inert>0.01?`<span class="badge">H₂ ${fmt(state.inert,2)} mol</span>`:''}`;
+      $('badges').innerHTML=`<span class="badge">${dir==='정반응'?'N₂O₄ 생성 증가':dir==='역반응'?'NO₂ 생성 증가':'K = Q 평형'}</span><span class="badge">NO₂ 비율 ${(no2Frac*100).toFixed(0)}%</span>${state.inert>0.01?`<span class="badge">He ${fmt(state.inert,2)} mol</span>`:''}`;
       $('formula').innerHTML='<b>계산식</b><br><code>2NO₂(g) ⇌ N₂O₄(g)</code><br><code>K = [N₂O₄] / [NO₂]²</code><br><code>Q = [N₂O₄]현재 / [NO₂]현재²</code>';
       const eq=state.targetGas; const rows=[
         ['NO₂', state.displayGas.no2, eq.no2, state.displayGas.no2/V], ['N₂O₄', state.displayGas.n2o4, eq.n2o4, state.displayGas.n2o4/V]
       ];
-      $('tableBody').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],3)} mol</td><td>${fmt(r[2],3)} mol</td><td>${fmt(r[3],3)} M</td></tr>`).join('') + (state.inert>0.01 ? `<tr><td>H₂</td><td>${fmt(state.inert,3)} mol</td><td>${fmt(state.inert,3)} mol</td><td>비활성</td></tr>` : '');
+      $('tableBody').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1],3)} mol</td><td>${fmt(r[2],3)} mol</td><td>${fmt(r[3],3)} M</td></tr>`).join('') + (state.inert>0.01 ? `<tr><td>He</td><td>${fmt(state.inert,3)} mol</td><td>${fmt(state.inert,3)} mol</td><td>비활성</td></tr>` : '');
       $('caption').innerHTML='<span class="caption-pill">피스톤 위치가 조건 변화에 따라 이동합니다.</span>';
     } else {
       $('leftEquation').textContent='Cr₂O₇²⁻ + H₂O ⇌ 2CrO₄²⁻ + 2H⁺';
@@ -1016,7 +1018,7 @@ APP_HTML = r'''
     if(act==='addInert'){
       state.inert=clamp(state.inert+amt,0,4.0);
       if(state.vessel==='cylinder'){
-        // 일정 외부 압력의 피스톤 실린더에서는 H₂가 부피를 늘려
+        // 일정 외부 압력의 피스톤 실린더에서는 He가 부피를 늘려
         // NO₂와 N₂O₄의 농도를 낮춘다. 따라서 순간적으로 옅어지고,
         // 이후 역반응으로 NO₂가 늘며 다시 진해지는 과정을 표현한다.
         triggerGasDensityPulse(-amt*1.35, 1900, .20);
