@@ -549,6 +549,11 @@ APP_HTML = r'''
     const c = Math.max(g.n2o4/effectiveVolume(g),0.001);
     return clamp(0.08 + c*0.32 + state.temp/1100, .03, 2.2);
   }
+  function gasRates(g=state.displayGas){
+    // 정반응·역반응 속도를 한 번에 반환하는 보조 함수다.
+    // 초기화 및 강철용기 He 첨가 처리에서 사용한다.
+    return {forward:rateForwardGas(g), reverse:rateReverseGas(g)};
+  }
   function rateForwardChromate(ch=state.displayChromate){ return clamp(0.25 + (1-ch.balance)*0.65 + state.temp/580, .08, 1.4); }
   function rateReverseChromate(ch=state.displayChromate){ return clamp(0.22 + ch.balance*0.55 + ch.h*.08, .08, 1.4); }
 
