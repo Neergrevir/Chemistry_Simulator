@@ -406,7 +406,7 @@ APP_HTML = r'''
     volumePulse:null,
     steelResetUntil:0,
     referenceGasTotal:3.00,
-    referenceTempK:BASE_TEMP_K,
+    referenceTempK:273 + 43,
     molecules:[],
     staticDots:[],
     lastTime:performance.now(),
