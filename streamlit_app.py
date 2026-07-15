@@ -409,6 +409,8 @@ APP_HTML = r'''
     anim:null,
     volumeAnim:null,
     volumePulse:null,
+    pendingGasTransition:null,
+    hePistonEmphasis:null,
     steelResetUntil:0,
     referenceGasTotal:3.00,
     referenceTempK:273 + 43,
@@ -457,7 +459,16 @@ APP_HTML = r'''
     const v = state.displayVolume ?? state.volume;
     if(state.experiment==='chromate') return 3.40;
     if(state.vessel==='steel') return v;
-    return effectiveVolume(state.displayGas, v);
+    let actual = effectiveVolume(state.displayGas, v);
+    // He 첨가 뒤 역반응으로 총 기체 몰수가 늘어나는 동안 피스톤 이동이
+    // 작은 화면에서도 보이도록 중간 구간에만 완만한 시각 강조를 더한다.
+    // 최종 시점에는 강조값이 0이 되어 실제 계산 부피와 정확히 일치한다.
+    if(state.hePistonEmphasis){
+      const t=clamp((performance.now()-state.hePistonEmphasis.start)/state.hePistonEmphasis.duration,0,1);
+      actual += state.hePistonEmphasis.extra * Math.sin(Math.PI*t);
+      if(t>=1) state.hePistonEmphasis=null;
+    }
+    return actual;
   }
   function setVolumeAnimated(newVolume, duration=900){
     const from = state.displayVolume ?? state.volume;
@@ -980,6 +991,14 @@ APP_HTML = r'''
   }
 
   function updateAnim(){
+    // He를 넣은 직후의 팽창 상태를 잠시 보여 준 다음 평형 이동을 시작한다.
+    // 이렇게 하면 '첨가 직후 부피'와 '새 평형 부피'의 두 단계가 분명히 관찰된다.
+    if(state.pendingGasTransition && performance.now()>=state.pendingGasTransition.startAt){
+      const pending=state.pendingGasTransition;
+      state.pendingGasTransition=null;
+      startTransition(pending.target,'helium-equilibrium');
+      state.hePistonEmphasis={start:performance.now(),duration:5000,extra:pending.extra};
+    }
     if(state.volumeAnim){
       const vt = clamp((performance.now()-state.volumeAnim.start)/state.volumeAnim.duration,0,1);
       state.displayVolume = lerp(state.volumeAnim.from,state.volumeAnim.to,ease(vt));
@@ -1240,9 +1259,30 @@ APP_HTML = r'''
       const reverse=rateReverseGas(state.displayGas);
       state.targetGas={...state.displayGas};
       state.anim=null;
+      state.pendingGasTransition=null;
+      state.hePistonEmphasis=null;
       state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:forward,rfEnd:forward,rrStart:reverse,rrEnd:reverse,start:performance.now(),duration:5000};
       updateUI();
+    } else if(act==='addInert' && state.vessel==='cylinder'){
+      // 1단계: He 첨가 직후, 외부 압력 일정 조건에서 피스톤이 먼저 올라간 상태를 보여 준다.
+      // 2단계: 약 0.65초 뒤 역반응(N₂O₄ → 2NO₂)이 시작되고 총 기체 몰수가 더 증가하면서
+      // 피스톤이 새 평형 위치까지 한 번 더 올라가도록 한다.
+      const target=solveGasEquilibrium(src);
+      const immediateV=effectiveVolume(src,state.volume);
+      const finalV=effectiveVolume(target,state.volume);
+      const actualDelta=Math.max(0,finalV-immediateV);
+      // 실제 최종 부피는 계산값을 그대로 사용하고, 이동 중에만 최대 0.16 L의 시각 강조를 준다.
+      const extra=clamp(0.10 + actualDelta*0.9,0.10,0.16);
+      state.targetGas={...target};
+      state.anim=null;
+      state.pendingGasTransition={target,startAt:performance.now()+650,extra};
+      const q=gasQ(src),k=gasK();
+      const rf=rateForwardGas(src),rr=rateReverseGas(src);
+      state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:rf,rfEnd:rf,rrStart:rr,rrEnd:rr,start:performance.now(),duration:650};
+      updateUI();
     } else {
+      state.pendingGasTransition=null;
+      state.hePistonEmphasis=null;
       startTransition(solveGasEquilibrium(src));
     }
   });
