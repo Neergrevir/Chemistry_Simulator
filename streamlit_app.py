@@ -726,54 +726,50 @@ APP_HTML = r'''
     g.fillText(label,x,labelY);
   }
 
-  function drawColorScale(g,x,y,h,t,mode){
-    const w=14;
+  function drawColorScaleBelowThermometer(g,cx,y,w,t,mode){
     const value=clamp(t,0,1);
-    const barX=x, barY=y;
-    const markerY=barY+h-(h*value);
     const isGas=mode==='gas';
-    const topColor=isGas ? '#9f5e35' : '#f8dc55';
-    const bottomColor=isGas ? '#f7fbff' : '#df7b32';
-    const topLabel=isGas ? '진함' : '노란색';
-    const bottomLabel=isGas ? '옅음' : '주황색';
+    const leftColor=isGas ? '#f7fbff' : '#df7b32';
+    const rightColor=isGas ? '#9f5e35' : '#f8dc55';
+    const leftLabel=isGas ? '옅음' : '주황색';
+    const rightLabel=isGas ? '진함' : '노란색';
     const stateLabel=isGas
       ? (value<.34 ? '옅은 갈색' : value<.67 ? '갈색' : '진한 갈색')
       : (value<.35 ? '주황색' : value<.65 ? '중간색' : '노란색');
+    const h=13;
+    const x=cx-w/2;
+    const markerX=x+w*value;
 
     g.save();
-    g.font='800 10.5px Segoe UI, sans-serif';
     g.textAlign='center';
     g.textBaseline='middle';
+    drawRoundedRect(g,x-12,y-20,w+24,62,15,'rgba(255,255,255,.88)','#d6e5f4',1);
 
-    // 온도계와 비슷한 세로형 색 변화 척도. 동그란 구는 사용하지 않는다.
-    drawRoundedRect(g,barX-10,barY-12,w+20,h+50,13,'rgba(255,255,255,.70)','#d6e5f4',1);
-    const grad=g.createLinearGradient(0,barY,0,barY+h);
-    grad.addColorStop(0,topColor);
-    grad.addColorStop(1,bottomColor);
-    drawRoundedRect(g,barX,barY,w,h,8,grad,'#8f9dae',2);
+    g.font='900 11.5px Segoe UI, sans-serif';
+    g.fillStyle='#253248';
+    g.fillText(stateLabel,cx,y-8);
+
+    const grad=g.createLinearGradient(x,0,x+w,0);
+    grad.addColorStop(0,leftColor);
+    grad.addColorStop(1,rightColor);
+    drawRoundedRect(g,x,y+4,w,h,7,grad,'#8f9dae',1.7);
 
     // 현재 색 위치 표시선. 원형 표식은 쓰지 않는다.
     g.strokeStyle='#253248';
     g.lineWidth=3;
     g.lineCap='round';
     g.beginPath();
-    g.moveTo(barX-5,markerY);
-    g.lineTo(barX+w+5,markerY);
+    g.moveTo(markerX,y+1);
+    g.lineTo(markerX,y+h+7);
     g.stroke();
 
-    g.fillStyle='#5b6b80';
-    g.fillText(topLabel,barX+w/2,barY-22);
-    g.fillText(bottomLabel,barX+w/2,barY+h+14);
-
-    g.font='900 11.5px Segoe UI, sans-serif';
-    g.fillStyle='#344156';
-    const labelY=barY+h+34;
-    const tw=g.measureText(stateLabel).width;
-    drawRoundedRect(g,barX+w/2-tw/2-8,labelY-12,tw+16,24,12,'rgba(255,255,255,.82)','#d6e5f4',1);
-    g.fillText(stateLabel,barX+w/2,labelY);
+    // 하단 글자는 흰 배경에서도 잘 보이도록 진한 색으로 고정한다.
+    g.font='800 10.5px Segoe UI, sans-serif';
+    g.fillStyle='#253248';
+    g.fillText(leftLabel,x+8,y+31);
+    g.fillText(rightLabel,x+w-8,y+31);
     g.restore();
   }
-
 
   function drawGasStage(W,H){
     const pg = pistonGeometry(W,H);
@@ -792,8 +788,8 @@ APP_HTML = r'''
       if(pt>=1) state.volumePulse=null;
     }
     const rawBrownAlpha = equilibriumBrown*.78 + concentrationBrown*.22 + pulseBrown;
-    // NO₂의 색 차이가 눈으로 더 잘 보이도록 색 변화 폭만 약 30% 강화한다.
-    // 평형 계산에 쓰이는 K, Q, 농도값은 그대로 두고, 캔버스의 색 표현만 조정한다.
+    // NO₂ 색 변화가 눈에 더 잘 보이도록 색 표현만 약 30% 강화한다.
+    // K, Q, 농도 계산에는 영향을 주지 않는다.
     const brownAlpha = clamp(.08 + (rawBrownAlpha-.08)*1.30, .06, .90);
     const vesselColor = `rgba(205,128,58,${brownAlpha})`;
 
@@ -845,9 +841,10 @@ APP_HTML = r'''
     for(const m of state.molecules) drawGasMolecule(ctx,m,1);
 
     const tx = Math.min(W-86, pg.x+pg.w+105);
-    const gasScale = clamp((brownAlpha-.06)/(.90-.06),0,1);
-    drawColorScale(ctx,Math.max(pg.x+pg.w+22,tx-66),pg.y+66,166,gasScale,'gas');
     drawThermometer(ctx,tx,pg.y+46,state.temp);
+    const gasScale = clamp((brownAlpha-.06)/(.90-.06),0,1);
+    const gasScaleY = Math.min(H-52, pg.y+330);
+    drawColorScaleBelowThermometer(ctx,tx,gasScaleY,96,gasScale,'gas');
   }
 
   function drawChromateStage(W,H){
@@ -971,8 +968,9 @@ APP_HTML = r'''
     }
 
     const chromateThermX = Math.min(W-82, centerX+beakerW/2+112);
-    drawColorScale(ctx,Math.max(centerX+beakerW/2+42,chromateThermX-66),topY+44,166,visualB,'chromate');
     drawThermometer(ctx,chromateThermX, topY+24, state.temp);
+    const chromateScaleY = Math.min(H-52, topY+308);
+    drawColorScaleBelowThermometer(ctx,chromateThermX,chromateScaleY,96,visualB,'chromate');
     ctx.restore();
   }
 
