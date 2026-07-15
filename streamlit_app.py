@@ -1071,7 +1071,7 @@ APP_HTML = r'''
       const species=chromateSpecies(state.displayChromate);
       const targetSpecies=chromateSpecies(state.targetChromate);
       const acidBaseLabel=species.hMol>1e-6?'산성':species.ohMol>1e-6?'염기성':'중성 부근';
-      $('formula').innerHTML='<b>계산식</b><br><code>HCl → H⁺ 1 mol 제공</code><br><code>NaOH의 OH⁻ + H⁺ → H₂O (1:1)</code><br><code>정반응: H⁺ 생성 · 역반응: H⁺ 소비</code><br><code>남은 H⁺가 0이 된 뒤에는 OH⁻가 축적되어 염기성이 됩니다.</code>';
+      $('formula').innerHTML='<b>계산식</b><br><code>HCl → H⁺ 1 mol 제공</code><br><code>NaOH의 OH⁻ + H⁺ → H₂O (1:1)</code><br><code>정반응: H⁺ 생성 · 역반응: H⁺ 소비</code><br><code>시약 수용액 첨가 → 전체 용액 부피 증가 → 희석 효과</code><br><code>H⁺가 0이 된 뒤에도 NaOH 수용액의 부피 증가로 정반응 이동이 계속됩니다.</code>';
       const orange=(1-b), yellow=b;
       $('tableBody').innerHTML=`<tr><td>Cr₂O₇²⁻</td><td>${fmt(orange,2)}</td><td>${fmt(1-state.targetChromate.balance,2)}</td><td>주황색</td></tr><tr><td>CrO₄²⁻</td><td>${fmt(yellow,2)}</td><td>${fmt(state.targetChromate.balance,2)}</td><td>노란색</td></tr><tr><td>H⁺</td><td>${fmt(species.hMol,3)} mol</td><td>${fmt(targetSpecies.hMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>OH⁻</td><td>${fmt(species.ohMol,3)} mol</td><td>${fmt(targetSpecies.ohMol,3)} mol</td><td>${acidBaseLabel}</td></tr><tr><td>용액 부피</td><td>${fmt(state.displayChromate.solutionVolume,3)} L</td><td>${fmt(state.targetChromate.solutionVolume,3)} L</td><td>시약 용액 포함</td></tr>`;
       $('caption').innerHTML='';
@@ -1265,8 +1265,13 @@ APP_HTML = r'''
       state.chromate.solutionVolume=(state.chromate.solutionVolume||1)+amt;
       state.chromate.dilution=clamp((state.chromate.dilution||0)+amt*.70,0,2.5);
     }
+    // HCl·NaOH 수용액도 용매를 포함하므로 첨가할수록 전체 용액 부피가 증가한다.
+    // 따라서 H⁺가 이미 모두 중화된 뒤에도 추가 NaOH 수용액의 희석 효과가 Q를 낮추고
+    // 크로메이트 생성 방향(정반응)으로 평형을 계속 이동시킨다.
+    const addedVolume = Math.max(0, (state.chromate.solutionVolume||1) - 1.00);
+    state.chromate.dilution=clamp(addedVolume*.70,0,2.5);
     state.chromate.h=acidityIndex(state.chromate.netAcid||0,state.chromate.solutionVolume||1);
-    state.displayChromate={...current,h:state.chromate.h,netAcid:state.chromate.netAcid,solutionVolume:state.chromate.solutionVolume,dilution:state.chromate.dilution||0};
+    state.displayChromate={...current,h:state.chromate.h,netAcid:state.chromate.netAcid,solutionVolume:state.chromate.solutionVolume,dilution:state.chromate.dilution};
     startTransition(solveChromateEquilibrium(state.chromate));
   });
   $('resetChromate').addEventListener('click',resetChromate);
