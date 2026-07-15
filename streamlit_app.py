@@ -981,15 +981,9 @@ APP_HTML = r'''
   }
 
   function updateAnim(){
-    // He 첨가는 별도의 대기 단계 없이 부피 증가와 평형 이동이 동시에 시작된다.
-    // displayInert를 짧게 보간하여 피스톤 팽창과 순간적인 색 희석이 자연스럽게 보이게 한다.
-    if(state.inertAnim){
-      const it=clamp((performance.now()-state.inertAnim.start)/state.inertAnim.duration,0,1);
-      state.displayInert=lerp(state.inertAnim.from,state.inertAnim.to,ease(it));
-      if(it>=1){state.displayInert=state.inertAnim.to;state.inertAnim=null;}
-    } else {
-      state.displayInert=state.inert;
-    }
+    // He는 버튼을 누르는 순간 지정한 몰수만큼 모두 들어간 것으로 처리한다.
+    // He로 인한 부피 증가는 즉시 나타나고, 이후에는 평형 조성 변화만 애니메이션된다.
+    state.displayInert=state.inert;
     if(state.volumeAnim){
       const vt = clamp((performance.now()-state.volumeAnim.start)/state.volumeAnim.duration,0,1);
       state.displayVolume = lerp(state.volumeAnim.from,state.volumeAnim.to,ease(vt));
@@ -1221,20 +1215,14 @@ APP_HTML = r'''
     if(act==='removeNO2') src.no2=Math.max(.04,src.no2-amt);
     if(act==='addN2O4') src.n2o4+=amt;
     if(act==='removeN2O4') src.n2o4=Math.max(.04,src.n2o4-amt);
-    let previousInert=state.displayInert ?? state.inert;
     if(act==='addInert'){
       state.inert=clamp(state.inert+amt,0,4.0);
-      if(state.vessel==='steel'){
-        // 정적 강철용기: 부피가 일정하므로 반응 기체의 농도와 Q는 변하지 않는다.
-        state.displayInert=state.inert;
-        state.inertAnim=null;
-        state.volumePulse=null;
-      } else {
-        // 피스톤 실린더: He 증가량을 전체 기체 몰수 증가로 반영한다.
-        // 별도 시간 지연 없이 부피 팽창과 평형 이동을 동시에 시작한다.
-        state.inertAnim={from:previousInert,to:state.inert,start:performance.now(),duration:900};
-        state.volumePulse=null;
-      }
+      // He는 사용자가 지정한 몰수만큼 한 번에 첨가한다.
+      // 따라서 displayInert도 즉시 최종값으로 바뀌고, 피스톤은 먼저 한 번에 팽창한다.
+      // 그 직후부터 반응 기체 조성만 5초 동안 새 평형으로 이동한다.
+      state.displayInert=state.inert;
+      state.inertAnim=null;
+      state.volumePulse=null;
     }
 
     state.gas={...src};state.displayGas={...src};
@@ -1248,8 +1236,8 @@ APP_HTML = r'''
       state.chart={qStart:q,qEnd:q,kStart:k,kEnd:k,rfStart:forward,rfEnd:forward,rrStart:reverse,rrEnd:reverse,start:performance.now(),duration:5000};
       updateUI();
     } else {
-      // 실린더의 He 첨가: 최종 He 양에서의 평형 조성을 계산하고 즉시 전환을 시작한다.
-      // 처음에는 He에 의한 팽창으로 색이 옅어지고, 이어 역반응으로 NO₂가 늘며 조금 진해진다.
+      // 실린더의 He 첨가: He 양과 부피는 즉시 증가시킨다.
+      // 그 직후의 옅어진 상태를 시작점으로 삼아 역반응 평형 이동만 5초 동안 보여준다.
       startTransition(solveGasEquilibrium(src), act==='addInert'?'helium-expansion':'condition');
     }  });
   $('resetGas').addEventListener('click',resetGas);
