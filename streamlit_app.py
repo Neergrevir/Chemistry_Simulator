@@ -238,7 +238,7 @@ APP_HTML = r'''
       <div class="select-label">실험 선택</div>
       <select id="experiment" class="experiment-select">
         <option value="gas">이산화질소 ↔ 사산화이질소  |  2NO₂(g) ⇌ N₂O₄(g)</option>
-        <option value="chromate">다이크로메이트 ↔ 크로메이트  |  Cr₂O₇²⁻(aq) + H₂O(l) ⇌ 2CrO₄²⁻(aq) + 2H⁺(aq)</option>
+        <option value="chromate">다이크로뮴산 ↔ 크로뮴산  |  Cr₂O₇²⁻(aq) + H₂O(l) ⇌ 2CrO₄²⁻(aq) + 2H⁺(aq)</option>
       </select>
     </div>
   </div>
@@ -438,8 +438,8 @@ APP_HTML = r'''
 
   const INITIAL_GAS_TOTAL = 3.00;
   const BASE_TEMP_K = 273 + 43;
-  const PISTON_VISUAL_GAIN_HE = 2.4;
-  const PISTON_VISUAL_GAIN_EQUILIBRIUM = 2.8;
+  const PISTON_VISUAL_GAIN_HE = 4.8;
+  const PISTON_VISUAL_GAIN_EQUILIBRIUM = 5.6;
   function activeGasTotal(g=state.displayGas, inertAmount=(state.displayInert ?? state.inert)){
     return Math.max(0.05, g.no2 + g.n2o4 + inertAmount);
   }
@@ -726,6 +726,55 @@ APP_HTML = r'''
     g.fillText(label,x,labelY);
   }
 
+  function drawColorScale(g,x,y,h,t,mode){
+    const w=14;
+    const value=clamp(t,0,1);
+    const barX=x, barY=y;
+    const markerY=barY+h-(h*value);
+    const isGas=mode==='gas';
+    const topColor=isGas ? '#9f5e35' : '#f8dc55';
+    const bottomColor=isGas ? '#f7fbff' : '#df7b32';
+    const topLabel=isGas ? '진함' : '노란색';
+    const bottomLabel=isGas ? '옅음' : '주황색';
+    const stateLabel=isGas
+      ? (value<.34 ? '옅은 갈색' : value<.67 ? '갈색' : '진한 갈색')
+      : (value<.35 ? '주황색' : value<.65 ? '중간색' : '노란색');
+
+    g.save();
+    g.font='800 10.5px Segoe UI, sans-serif';
+    g.textAlign='center';
+    g.textBaseline='middle';
+
+    // 온도계와 비슷한 세로형 색 변화 척도. 동그란 구는 사용하지 않는다.
+    drawRoundedRect(g,barX-10,barY-12,w+20,h+50,13,'rgba(255,255,255,.70)','#d6e5f4',1);
+    const grad=g.createLinearGradient(0,barY,0,barY+h);
+    grad.addColorStop(0,topColor);
+    grad.addColorStop(1,bottomColor);
+    drawRoundedRect(g,barX,barY,w,h,8,grad,'#8f9dae',2);
+
+    // 현재 색 위치 표시선. 원형 표식은 쓰지 않는다.
+    g.strokeStyle='#253248';
+    g.lineWidth=3;
+    g.lineCap='round';
+    g.beginPath();
+    g.moveTo(barX-5,markerY);
+    g.lineTo(barX+w+5,markerY);
+    g.stroke();
+
+    g.fillStyle='#5b6b80';
+    g.fillText(topLabel,barX+w/2,barY-22);
+    g.fillText(bottomLabel,barX+w/2,barY+h+14);
+
+    g.font='900 11.5px Segoe UI, sans-serif';
+    g.fillStyle='#344156';
+    const labelY=barY+h+34;
+    const tw=g.measureText(stateLabel).width;
+    drawRoundedRect(g,barX+w/2-tw/2-8,labelY-12,tw+16,24,12,'rgba(255,255,255,.82)','#d6e5f4',1);
+    g.fillText(stateLabel,barX+w/2,labelY);
+    g.restore();
+  }
+
+
   function drawGasStage(W,H){
     const pg = pistonGeometry(W,H);
     const no2Frac = state.displayGas.no2/(state.displayGas.no2+state.displayGas.n2o4+1e-6);
@@ -742,7 +791,10 @@ APP_HTML = r'''
       pulseBrown = state.volumePulse.amount * 0.85 * (1-ease(pt));
       if(pt>=1) state.volumePulse=null;
     }
-    const brownAlpha = clamp(equilibriumBrown*.78 + concentrationBrown*.22 + pulseBrown, .08, .86);
+    const rawBrownAlpha = equilibriumBrown*.78 + concentrationBrown*.22 + pulseBrown;
+    // NO₂의 색 차이가 눈으로 더 잘 보이도록 색 변화 폭만 약 30% 강화한다.
+    // 평형 계산에 쓰이는 K, Q, 농도값은 그대로 두고, 캔버스의 색 표현만 조정한다.
+    const brownAlpha = clamp(.08 + (rawBrownAlpha-.08)*1.30, .06, .90);
     const vesselColor = `rgba(205,128,58,${brownAlpha})`;
 
     if(state.vessel==='cylinder'){
@@ -793,6 +845,8 @@ APP_HTML = r'''
     for(const m of state.molecules) drawGasMolecule(ctx,m,1);
 
     const tx = Math.min(W-86, pg.x+pg.w+105);
+    const gasScale = clamp((brownAlpha-.06)/(.90-.06),0,1);
+    drawColorScale(ctx,Math.max(pg.x+pg.w+22,tx-66),pg.y+66,166,gasScale,'gas');
     drawThermometer(ctx,tx,pg.y+46,state.temp);
   }
 
@@ -916,7 +970,9 @@ APP_HTML = r'''
       ctx.fillText('평형',centerX,topY+beakerH+36);
     }
 
-    drawThermometer(ctx,Math.min(W-82, centerX+beakerW/2+112), topY+24, state.temp);
+    const chromateThermX = Math.min(W-82, centerX+beakerW/2+112);
+    drawColorScale(ctx,Math.max(centerX+beakerW/2+42,chromateThermX-66),topY+44,166,visualB,'chromate');
+    drawThermometer(ctx,chromateThermX, topY+24, state.temp);
     ctx.restore();
   }
 
@@ -1082,7 +1138,7 @@ APP_HTML = r'''
       $('containerNote').textContent='';
       $('legend').innerHTML='<span class="legend-chip"><span class="legend-dot" style="background:#df7b32"></span>Cr₂O₇²⁻ 주황색</span><span class="legend-chip"><span class="legend-dot" style="background:#f7d84d"></span>CrO₄²⁻ 노란색</span>';
       const K=chromateK(), Q=chromateQ(), dir=directionFrom(Q,K), b=state.displayChromate.balance;
-      $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent='비커';
+      $('kVal').textContent=fmt(K,2); $('qVal').textContent=fmt(Q,2); $('directionVal').textContent=dir; $('currentVolVal').textContent=fmt(state.displayChromate.solutionVolume,3)+' L';
       if(state.anim && state.anim.type==='chromate') {
         const deltaBalance = state.anim.target.balance - state.anim.start.balance;
         const status = deltaBalance > 0.002
